@@ -1,7 +1,5 @@
 #include "../include/Process.h"
-#include "../include/Pipe.h"
 #include <stdexcept>
-#include <iostream>
 #include <sys/wait.h>
 #include "unistd.h"
 #include "fcntl.h"

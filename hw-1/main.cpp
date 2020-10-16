@@ -1,5 +1,5 @@
 #include <iostream>
-#include "./include/Process.h"
+#include "Process.h"
 #include <unistd.h>
 
 int main() {
