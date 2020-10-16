@@ -1,6 +1,7 @@
 #include "../include/Process.h"
 #include "../include/Pipe.h"
 #include <stdexcept>
+#include <iostream>
 #include <sys/wait.h>
 #include "unistd.h"
 #include "fcntl.h"
@@ -15,18 +16,15 @@ Process::Process(const std::string& path) {
     if (pipe(wr_pipe) == -1) {
         throw std::runtime_error("Pipe creation error");
     }
-    if (::close(rd_pipe[1]) == -1) {
-        throw std::runtime_error("Close fd error");
-    }
-    if (::close(wr_pipe[0]) == -1) {
-        throw std::runtime_error("Close fd error");
-    }
     rd_.replace(rd_pipe[0]);
     wr_.replace(wr_pipe[1]);
-    Pipe tmp_pipe(O_CLOEXEC);
+    int tmp_pipe[2];
+    pipe2(tmp_pipe, O_CLOEXEC);
     pid_ = fork();
     if (pid_ != -1) {
         if (pid_ == 0) {
+            dup2(rd_pipe[1], STDOUT_FILENO);
+            dup2(wr_pipe[0], STDIN_FILENO);
             rd_.close();
             wr_.close();
             int pos = path.rfind('/');
@@ -37,8 +35,17 @@ Process::Process(const std::string& path) {
             execlp(path.data(), name.data(), nullptr);
             exit(-1);
         }
+        if (::close(rd_pipe[1]) == -1) {
+            throw std::runtime_error("Close fd error");
+        }
+        if (::close(wr_pipe[0]) == -1) {
+            throw std::runtime_error("Close fd error");
+        }
+        if (::close(tmp_pipe[1]) == -1) {
+            throw std::runtime_error("Close fd error");
+        }
         char tmp;
-        if (::read(tmp_pipe.rd(), &tmp, sizeof(tmp)) == -1) {
+        if (::read(tmp_pipe[0], &tmp, sizeof(tmp)) == -1) {
             throw std::runtime_error("Read error");
         }
     }
