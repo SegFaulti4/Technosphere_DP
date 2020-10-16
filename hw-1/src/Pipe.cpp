@@ -1,4 +1,4 @@
-#include "../include/Pipe.h"
+#include "Pipe.h"
 #include <stdexcept>
 #include "unistd.h"
 

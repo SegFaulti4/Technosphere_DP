@@ -1,4 +1,4 @@
-#include "../include/Process.h"
+#include "Process.h"
 #include <stdexcept>
 #include <sys/wait.h>
 #include "unistd.h"
