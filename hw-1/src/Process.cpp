@@ -1,58 +1,48 @@
 #include "Process.h"
-#include <stdexcept>
-#include <sys/wait.h>
-#include "unistd.h"
-#include "fcntl.h"
+#include "Pipe.h"
 
 Process::Process(const std::string& path) {
     pid_ = -1;
-    int rd_pipe[2];
-    int wr_pipe[2];
-    if (pipe(rd_pipe) == -1) {
-        throw std::runtime_error("Pipe creation error");
-    }
-    if (pipe(wr_pipe) == -1) {
-        throw std::runtime_error("Pipe creation error");
-    }
-    rd_.replace(rd_pipe[0]);
-    wr_.replace(wr_pipe[1]);
-    int tmp_pipe[2];
-    pipe2(tmp_pipe, O_CLOEXEC);
+    Pipe rd_pipe(0);
+    Pipe wr_pipe(0);
+    Pipe tmp_pipe(O_CLOEXEC);
+    rd_.set_fd(dup(rd_pipe.rd()));
+    wr_.set_fd(dup(wr_pipe.wr()));
     pid_ = fork();
-    if (pid_ != -1) {
-        if (pid_ == 0) {
-            dup2(rd_pipe[1], STDOUT_FILENO);
-            dup2(wr_pipe[0], STDIN_FILENO);
-            rd_.close();
-            wr_.close();
-            int pos = path.rfind('/');
-            if (pos >= path.length()) {
-                pos = 0;
-            }
-            std::string name = path.substr(pos);
-            execlp(path.data(), name.data(), nullptr);
-            exit(-1);
-        }
-        if (::close(rd_pipe[1]) == -1) {
-            throw std::runtime_error("Close fd error");
-        }
-        if (::close(wr_pipe[0]) == -1) {
-            throw std::runtime_error("Close fd error");
-        }
-        if (::close(tmp_pipe[1]) == -1) {
-            throw std::runtime_error("Close fd error");
-        }
-        char tmp;
-        if (::read(tmp_pipe[0], &tmp, sizeof(tmp)) == -1) {
-            throw std::runtime_error("Read error");
-        }
+    if (pid_ == -1) {
+        rd_pipe.close();
+        wr_pipe.close();
+        tmp_pipe.close();
+        rd_.close();
+        wr_.close();
+        throw std::runtime_error("Fork error");
     }
+    if (pid_ == 0) {
+        ::close(rd_pipe.wr());
+        ::close(wr_pipe.rd());
+        dup2(rd_pipe.wr(), STDOUT_FILENO);
+        dup2(wr_pipe.rd(), STDIN_FILENO);
+        rd_.close();
+        wr_.close();
+        int pos = path.rfind('/');
+        if (pos >= path.length()) {
+            pos = 0;
+        }
+        std::string name = path.substr(pos);
+        execlp(path.data(), name.data(), nullptr);
+        exit(-1);
+    }
+    char tmp;
+    tmp_pipe.close_wr();
+    if (::read(tmp_pipe.rd(), &tmp, sizeof(tmp)) == -1) {
+        throw std::runtime_error("Read error");
+    }
+    int status;
+    waitpid(pid_, &status, WNOHANG);
 }
 
 Process::~Process() {
-    if (pid_ != -1) {
-        Process::close();
-    }
+    close();
 }
 
 void Process::pid_update() {
@@ -64,15 +54,11 @@ void Process::pid_update() {
 }
 
 void Process::closeStdin() {
-    if (pid_ != -1) {
-        rd_.close();
-    }
+    rd_.close();
 }
 
 void Process::closeStdout() {
-    if (pid_ != -1) {
-        wr_.close();
-    }
+    wr_.close();
 }
 
 void Process::close() {
@@ -81,63 +67,45 @@ void Process::close() {
         int status;
         waitpid(pid_, &status, 0);
         pid_ = -1;
-        Process::closeStdin();
-        Process::closeStdout();
+        closeStdin();
+        closeStdout();
     }
 }
 
-size_t Process::write(const void *data, size_t len) {
-    if (data == nullptr) {
-        return 0;
+ssize_t Process::write(const void *data, size_t len) {
+    ssize_t res = wr_.write(data, len);
+    if (res == -1) {
+        throw std::runtime_error("Write error");
     }
-    if (pid_ != -1) {
-        int res = wr_.write(data, len);
-        if (res == -1) {
-            throw std::runtime_error("Write error");
-        }
-        return res;
-    }
-    return 0;
+    return res;
 }
 
-size_t Process::read(void *data, size_t len) {
-    if (data == nullptr) {
-        return 0;
+ssize_t Process::read(void *data, size_t len) {
+    ssize_t res = rd_.read(data, len);
+    if (res == -1) {
+        throw std::runtime_error("Read error");
     }
-    if (pid_ != -1) {
-        int res = rd_.read(data, len);
-        if (res == -1) {
-            throw std::runtime_error("Read error");
-        }
-        return res;
-    }
-    return 0;
+    return res;
 }
 
 void Process::writeExact(const void *data, size_t len) {
-    if (data == nullptr) {
-        return;
-    }
-    size_t cur = 0;
-    size_t res;
-    if (pid_ != -1) {
-        while (cur < len) {
-            res = Process::write(static_cast<const char*>(data) + cur, len - cur);
-            cur += res;
+    ssize_t cur = 0;
+    ssize_t res;
+    while (cur < len) {
+        if (!(res = write(static_cast<const char*>(data) + cur, len - cur))) {
+            break;
         }
+        cur += res;
     }
 }
 
 void Process::readExact(void *data, size_t len) {
-    if (data == nullptr) {
-        return;
-    }
-    size_t cur = 0;
-    size_t res;
-    if (pid_ != -1) {
-        while (cur < len) {
-            res = Process::read(static_cast<char*>(data) + cur, len - cur);
-            cur += res;
+    ssize_t cur = 0;
+    ssize_t res;
+    while (cur < len) {
+        if (!(res = read(static_cast<char*>(data) + cur, len - cur))) {
+            break;
         }
+        cur += res;
     }
 }

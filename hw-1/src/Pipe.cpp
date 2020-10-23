@@ -1,46 +1,31 @@
 #include "Pipe.h"
-#include <stdexcept>
-#include "unistd.h"
 
 Pipe::Pipe(int flag) {
-    fd_[0] = -1;
-    fd_[1] = -1;
-    if (::pipe2(fd_, flag) == -1) {
+    int fd[2];
+    if (::pipe2(fd, flag) == -1) {
         throw std::runtime_error("Pipe creation error");
     }
-}
-
-Pipe::~Pipe() {
-    Pipe::close();
+    rd_.set_fd(fd[0]);
+    wr_.set_fd(fd[1]);
 }
 
 int Pipe::rd() {
-    return fd_[0];
+    return rd_.get_fd();
 }
 
 int Pipe::wr() {
-    return fd_[1];
+    return wr_.get_fd();
 }
 
 void Pipe::close_rd() {
-    if (fd_[0] != -1) {
-        if (::close(fd_[0]) == -1) {
-            throw std::runtime_error("Close fd error");
-        }
-        fd_[0] = -1;
-    }
+    rd_.close();
 }
 
 void Pipe::close_wr() {
-    if (fd_[1] != -1) {
-        if (::close(fd_[1]) == -1) {
-            throw std::runtime_error("Close fd error");
-        }
-        fd_[1] = -1;
-    }
+    wr_.close();
 }
 
 void Pipe::close() {
-    Pipe::close_rd();
-    Pipe::close_wr();
+    close_rd();
+    close_wr();
 }

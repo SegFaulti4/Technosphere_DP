@@ -1,11 +1,16 @@
 #ifndef HW_1_PROCESS_H
 #define HW_1_PROCESS_H
 
-#include "FileDes.h"
+#include "Pipe.h"
+#include "Descriptor.h"
+#include <stdexcept>
+#include <sys/wait.h>
+#include "unistd.h"
+#include "fcntl.h"
 
 class Process {
 private:
-    FileDes rd_, wr_;
+    Descriptor rd_, wr_;
     pid_t pid_;
 
 public:
@@ -16,8 +21,8 @@ public:
     void closeStdin();
     void closeStdout();
     void close();
-    size_t write(const void *data, size_t len);
-    size_t read(void *data, size_t len);
+    ssize_t write(const void *data, size_t len);
+    ssize_t read(void *data, size_t len);
     void writeExact(const void *data, size_t len);
     void readExact(void *data, size_t len);
 };

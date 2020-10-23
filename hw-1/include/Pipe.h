@@ -1,13 +1,16 @@
 #ifndef HW_1_PIPE_H
 #define HW_1_PIPE_H
 
+#include "Descriptor.h"
+#include <stdexcept>
+#include "unistd.h"
+
 class Pipe{
 private:
-    int fd_[2];
+    Descriptor rd_, wr_;
 
 public:
     explicit Pipe(int flag = 0);
-    ~Pipe();
 
     int rd();
     int wr();
