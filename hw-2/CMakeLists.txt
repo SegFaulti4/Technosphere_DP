@@ -1,9 +1,10 @@
 cmake_minimum_required(VERSION 3.17)
-project(hw_2)
+project(log)
 
-set(LOG_LIB_NAME log)
-include_directories(include)
-add_subdirectory(src)
+set(PROJECT_SRC src/BaseLogger.cpp src/FileLogger.cpp
+        src/Descriptor.cpp src/StderrLogger.cpp src/StdoutLogger.cpp)
+set(PROJECT_INCLUDE include)
 
-add_executable(${PROJECT_NAME} main.cpp)
-target_link_libraries(${PROJECT_NAME} ${LOG_LIB_NAME})
+add_library(${PROJECT_NAME} STATIC ${PROJECT_SRC})
+target_include_directories(${PROJECT_NAME} PUBLIC ${PROJECT_INCLUDE})
+#target_sources(${PROJECT_NAME} PUBLIC main.cpp)

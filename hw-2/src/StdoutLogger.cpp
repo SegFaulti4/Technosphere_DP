@@ -1,5 +1,4 @@
 #include "StdoutLogger.h"
-#include <iostream>
 
 namespace log {
 

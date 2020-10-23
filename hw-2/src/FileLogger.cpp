@@ -1,20 +1,23 @@
 #include "FileLogger.h"
-#include "fcntl.h"
-#include <stdexcept>
 
 namespace log {
 
     FileLogger::FileLogger(const std::string &path, Logger_level lvl) {
-        ofstream_.open(path, O_WRONLY | O_APPEND | O_CREAT);
+        open(path);
         level_ = lvl;
     }
 
     void FileLogger::flush() {
-        ofstream_.flush();
+        if (::fsync(ofstream_.get_fd()) == -1) {
+            throw std::runtime_error("Fsync error");
+        }
     }
 
-    void FileLogger::open(std::string &path) {
-        ofstream_.open(path, O_WRONLY | O_APPEND | O_CREAT);
+    void FileLogger::open(const std::string &path) {
+        ofstream_.set_fd(::open(path.data(), O_WRONLY | O_APPEND | O_CREAT));
+        if (ofstream_.get_fd() == -1) {
+            throw std::runtime_error("Open error\n");
+        }
     }
 
     void FileLogger::close() {
@@ -22,8 +25,7 @@ namespace log {
     }
 
     FileLogger::~FileLogger() {
-        FileLogger::flush();
-        FileLogger::close();
+        ::fsync(ofstream_.get_fd());
     }
 
     void FileLogger::log(std::string &what, Logger_level lvl) {

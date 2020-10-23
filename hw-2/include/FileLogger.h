@@ -2,13 +2,16 @@
 #define HW_2_FILELOGGER_H
 
 #include "BaseLogger.h"
-#include "FileDes.h"
+#include "Descriptor.h"
+#include "fcntl.h"
+#include "unistd.h"
+#include <stdexcept>
 
 namespace log {
 
     class FileLogger : public BaseLogger {
     private:
-        FileDes ofstream_;
+        Descriptor ofstream_;
 
         void log(std::string &what, Logger_level lvl) override;
 
@@ -17,7 +20,7 @@ namespace log {
 
         ~FileLogger();
 
-        void open(std::string &path);
+        void open(const std::string &path);
 
         void close();
 

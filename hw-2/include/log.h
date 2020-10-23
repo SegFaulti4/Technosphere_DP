@@ -5,6 +5,6 @@
 #include "FileLogger.h"
 #include "StdoutLogger.h"
 #include "StderrLogger.h"
-#include "FileDes.h"
+#include "Descriptor.h"
 
 #endif //HW_2_LOG_H

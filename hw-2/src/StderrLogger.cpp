@@ -1,5 +1,4 @@
 #include "StderrLogger.h"
-#include <iostream>
 
 namespace log {
 
