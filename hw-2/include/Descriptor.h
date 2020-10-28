@@ -10,18 +10,19 @@ namespace log {
 
     class Descriptor {
     private:
-        int fd_;
+        int fd_ = -1;
 
     public:
-        explicit Descriptor(int fd = -1);
+        Descriptor();
+        explicit Descriptor(int fd);
         Descriptor(Descriptor && other) noexcept;
         ~Descriptor();
 
         void close();
         void set_fd(int fd);
         int get_fd() const;
-        ssize_t read(void *buf, size_t count) const;
-        ssize_t write(const void *buf, size_t count) const;
+        size_t read(void *buf, size_t count) const;
+        size_t write(const void *buf, size_t count) const;
         void readExact(void *buf, size_t count) const;
         void writeExact(const void *buf, size_t count) const;
         Descriptor & operator=(Descriptor && other) noexcept;

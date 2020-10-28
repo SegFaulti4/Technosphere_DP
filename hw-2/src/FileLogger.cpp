@@ -25,14 +25,16 @@ namespace log {
     }
 
     FileLogger::~FileLogger() {
-        ::fsync(ofstream_.get_fd());
+        ::close(ofstream_.get_fd());
     }
 
     void FileLogger::log(std::string &what, Logger_level lvl) {
-        if (lvl >= level_) {
+        if (level_ <= lvl) {
             ofstream_.write(LOGGER_LEVEL_OUT_TABLE[level_].data(),
                             LOGGER_LEVEL_OUT_TABLE[level_].length());
             ofstream_.write(what.data(), what.length());
+            char tmp = '\n';
+            ofstream_.write(&tmp, sizeof(tmp));
         }
     }
 

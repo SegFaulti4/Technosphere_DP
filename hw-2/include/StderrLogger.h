@@ -11,7 +11,9 @@ namespace log {
         void log(std::string &what, Logger_level lvl) override;
 
     public:
-        explicit StderrLogger(Logger_level lvl = LL_DEBUG);
+        StderrLogger();
+
+        explicit StderrLogger(Logger_level lvl);
 
         void flush() override;
     };

@@ -7,10 +7,10 @@
 namespace log {
 
     enum Logger_level {
-        LL_DEBUG = 0,
-        LL_INFO = 1,
-        LL_WARN = 2,
-        LL_ERROR = 3
+        LL_DEBUG,
+        LL_INFO,
+        LL_WARN,
+        LL_ERROR
     };
 
     class BaseLogger {
@@ -18,10 +18,10 @@ namespace log {
         Logger_level level_ = LL_DEBUG;
         virtual void log(std::string &what, Logger_level lvl) {};
         std::vector<std::string> LOGGER_LEVEL_OUT_TABLE = {
-                "debug:",
-                "info:",
-                "warn:",
-                "error:"
+                "debug: ",
+                "info: ",
+                "warn: ",
+                "error: "
         };
 
     public:
