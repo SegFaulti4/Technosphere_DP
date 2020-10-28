@@ -2,30 +2,34 @@
 #include "Pipe.h"
 
 Process::Process(const std::string& path) {
-    pid_ = -1;
-    Pipe rd_pipe(0);
-    Pipe wr_pipe(0);
+    Pipe rd_pipe;
+    Pipe wr_pipe;
     Pipe tmp_pipe(O_CLOEXEC);
     rd_.set_fd(dup(rd_pipe.rd()));
+    if (rd_.get_fd() == -1) {
+        throw std::runtime_error("Dup error\n");
+    }
     wr_.set_fd(dup(wr_pipe.wr()));
+    if (wr_.get_fd() == -1) {
+        throw std::runtime_error("Dup error\n");
+    }
     pid_ = fork();
     if (pid_ == -1) {
-        rd_pipe.close();
-        wr_pipe.close();
-        tmp_pipe.close();
-        rd_.close();
-        wr_.close();
-        throw std::runtime_error("Fork error");
+        throw std::runtime_error("Fork error\n");
     }
     if (pid_ == 0) {
-        ::close(rd_pipe.wr());
-        ::close(wr_pipe.rd());
-        dup2(rd_pipe.wr(), STDOUT_FILENO);
-        dup2(wr_pipe.rd(), STDIN_FILENO);
+        rd_pipe.close_rd();
+        wr_pipe.close_wr();
+        if (::dup2(rd_pipe.wr(), STDOUT_FILENO) == -1) {
+            throw std::runtime_error("Dup2 error\n");
+        }
+        if (::dup2(wr_pipe.rd(), STDIN_FILENO) == -1) {
+            throw std::runtime_error("Dup2 error\n");
+        }
         rd_.close();
         wr_.close();
-        int pos = path.rfind('/');
-        if (pos >= path.length()) {
+        size_t pos = path.rfind('/');
+        if (pos == std::string::npos) {
             pos = 0;
         }
         std::string name = path.substr(pos);
@@ -35,21 +39,39 @@ Process::Process(const std::string& path) {
     char tmp;
     tmp_pipe.close_wr();
     if (::read(tmp_pipe.rd(), &tmp, sizeof(tmp)) == -1) {
-        throw std::runtime_error("Read error");
+        throw std::runtime_error("Read error\n");
     }
     int status;
-    waitpid(pid_, &status, WNOHANG);
+    pid_t res = waitpid(pid_, &status, WNOHANG);
+    if (res == -1) {
+        throw std::runtime_error("Waitpid error\n");
+    }
+    if (res == pid_) {
+        if ((!WIFEXITED(status) && !WIFSIGNALED(status)) || WEXITSTATUS(status)) {
+            throw std::runtime_error("Child process ended with error\n");
+        }
+    }
 }
 
 Process::~Process() {
-    close();
+    kill(pid_, SIGINT);
+    waitpid(pid_, nullptr, 0);
+    ::close(rd_.get_fd());
+    ::close(wr_.get_fd());
 }
 
 void Process::pid_update() {
     int status;
-    waitpid(pid_, &status, WNOHANG);
-    if (WIFEXITED(status) || WIFEXITED(status)) {
-        pid_ = -1;
+    pid_t res = waitpid(pid_, &status, WNOHANG);
+    if (res == -1) {
+        throw std::runtime_error("Waitpid error\n");
+    }
+    if (res == pid_) {
+        if ((WIFEXITED(status) || WIFSIGNALED(status)) && WEXITSTATUS(status) == 0) {
+            pid_ = -1;
+        } else {
+            throw std::runtime_error("Child process ended with error\n");
+        }
     }
 }
 
@@ -72,40 +94,18 @@ void Process::close() {
     }
 }
 
-ssize_t Process::write(const void *data, size_t len) {
-    ssize_t res = wr_.write(data, len);
-    if (res == -1) {
-        throw std::runtime_error("Write error");
-    }
-    return res;
+size_t Process::write(const void *data, size_t len) {
+    return wr_.write(data, len);
 }
 
-ssize_t Process::read(void *data, size_t len) {
-    ssize_t res = rd_.read(data, len);
-    if (res == -1) {
-        throw std::runtime_error("Read error");
-    }
-    return res;
+size_t Process::read(void *data, size_t len) {
+    return rd_.read(data, len);
 }
 
 void Process::writeExact(const void *data, size_t len) {
-    ssize_t cur = 0;
-    ssize_t res;
-    while (cur < len) {
-        if (!(res = write(static_cast<const char*>(data) + cur, len - cur))) {
-            break;
-        }
-        cur += res;
-    }
+    wr_.writeExact(data, len);
 }
 
 void Process::readExact(void *data, size_t len) {
-    ssize_t cur = 0;
-    ssize_t res;
-    while (cur < len) {
-        if (!(res = read(static_cast<char*>(data) + cur, len - cur))) {
-            break;
-        }
-        cur += res;
-    }
+    rd_.readExact(data, len);
 }
