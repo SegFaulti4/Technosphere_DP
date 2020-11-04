@@ -4,6 +4,7 @@
 #include <string>
 #include "fcntl.h"
 #include <stdexcept>
+#include <utility>
 #include "unistd.h"
 
 class Descriptor {
@@ -11,7 +12,7 @@ private:
     int fd_ = -1;
 
 public:
-    Descriptor();
+    Descriptor() = default;
     explicit Descriptor(int fd);
     Descriptor(Descriptor && other) noexcept;
     ~Descriptor();

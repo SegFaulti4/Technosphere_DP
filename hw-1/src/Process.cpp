@@ -26,6 +26,8 @@ Process::Process(const std::string& path) {
         if (::dup2(wr_pipe.rd(), STDIN_FILENO) == -1) {
             throw std::runtime_error("Dup2 error\n");
         }
+        rd_pipe.close_rd();
+        wr_pipe.close_wr();
         rd_.close();
         wr_.close();
         size_t pos = path.rfind('/');

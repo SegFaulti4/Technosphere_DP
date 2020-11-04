@@ -1,7 +1,5 @@
 #include "Descriptor.h"
 
-Descriptor::Descriptor() = default;
-
 Descriptor::Descriptor(int fd) {
     fd_ = fd;
 }
@@ -60,7 +58,7 @@ void Descriptor::writeExact(const void *data, size_t len) const {
     size_t res;
     while (cur < len) {
         if (!(res = write(static_cast<const char*>(data) + cur, len - cur))) {
-            break;
+            throw std::runtime_error("Failed to write exact\n");
         }
         cur += res;
     }
@@ -71,7 +69,7 @@ void Descriptor::readExact(void *data, size_t len) const {
     size_t res;
     while (cur < len) {
         if (!(res = read(static_cast<char*>(data) + cur, len - cur))) {
-            break;
+            throw std::runtime_error("Failed to read exact\n");
         }
         cur += res;
     }
@@ -80,8 +78,7 @@ void Descriptor::readExact(void *data, size_t len) const {
 Descriptor & Descriptor::operator=(Descriptor &&other) noexcept {
     if (this != &other) {
         close();
-        fd_ = other.fd_;
-        other.fd_ = -1;
+        fd_ = std::exchange(other.fd_, -1);
     }
     return *this;
 }
