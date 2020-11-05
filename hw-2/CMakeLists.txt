@@ -3,7 +3,7 @@ project(log)
 
 set(CMAKE_CXX_STANDARD 17)
 set(PROJECT_SRC src/BaseLogger.cpp src/FileLogger.cpp
-        src/Descriptor.cpp src/StderrLogger.cpp src/StdoutLogger.cpp)
+        src/Global.cpp src/Logger.cpp)
 set(PROJECT_INCLUDE include)
 
 add_library(${PROJECT_NAME} STATIC ${PROJECT_SRC})
@@ -20,3 +20,7 @@ target_link_libraries(test_2 PUBLIC ${PROJECT_NAME})
 add_executable(test_3 test/test_3.cpp)
 target_include_directories(test_3 PUBLIC ${PROJECT_INCLUDE})
 target_link_libraries(test_3 PUBLIC ${PROJECT_NAME})
+
+add_executable(test_4 test/test_4.cpp)
+target_include_directories(test_4 PUBLIC ${PROJECT_INCLUDE})
+target_link_libraries(test_4 PUBLIC ${PROJECT_NAME})

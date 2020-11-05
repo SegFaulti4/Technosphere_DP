@@ -8,13 +8,14 @@ namespace log {
 
     class StdoutLogger : public BaseLogger {
     private:
-        void log(std::string &what, Logger_level lvl) override;
+        std::ostream& stream_ = std::cout;
 
     public:
-        StdoutLogger();
-        explicit StdoutLogger(Logger_level lvl);
+        StdoutLogger() : BaseLogger(std::cout) {}
 
-        void flush() override;
+        explicit StdoutLogger(Logger_level lvl) : BaseLogger(std::cout) {
+            level_ = lvl;
+        }
     };
 
 }

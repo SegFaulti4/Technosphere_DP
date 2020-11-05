@@ -3,35 +3,40 @@
 
 #include <string>
 #include <vector>
+#include <iostream>
+#include <memory>
 
 namespace log {
 
     enum Logger_level {
-        LL_DEBUG,
-        LL_INFO,
-        LL_WARN,
-        LL_ERROR
+        LL_ERROR = 0,
+        LL_WARN = 1,
+        LL_INFO = 2,
+        LL_DEBUG = 3
     };
 
     class BaseLogger {
     protected:
+        std::ostream& stream_;
         Logger_level level_ = LL_DEBUG;
-        virtual void log(std::string &what, Logger_level lvl) {};
+        void log(const std::string & what, Logger_level lvl);
         std::vector<std::string> LOGGER_LEVEL_OUT_TABLE = {
-                "debug: ",
-                "info: ",
+                "error: ",
                 "warn: ",
-                "error: "
+                "info: ",
+                "debug: "
         };
 
     public:
-        void debug(std::string &what);
-        void info(std::string &what);
-        void warn(std::string &what);
-        void error(std::string &what);
+        explicit BaseLogger(std::ostream & stream):stream_(stream) {}
+
+        void debug(const std::string & what);
+        void info(const std::string & what);
+        void warn(const std::string & what);
+        void error(const std::string & what);
         void set_level(Logger_level lvl);
         int level();
-        virtual void flush() {};
+        void flush();
     };
 
 }

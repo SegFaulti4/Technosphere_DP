@@ -2,29 +2,29 @@
 #define HW_2_FILELOGGER_H
 
 #include "BaseLogger.h"
-#include "Descriptor.h"
 #include "fcntl.h"
 #include "unistd.h"
 #include <stdexcept>
+#include <fstream>
 
 namespace log {
 
     class FileLogger : public BaseLogger {
     private:
-        Descriptor ofstream_;
-
-        void log(std::string &what, Logger_level lvl) override;
+        std::ofstream ofstream_;
+        std::ofstream& stream_;
 
     public:
-        explicit FileLogger(const std::string &path, Logger_level lvl);
+        explicit FileLogger(const std::string & path) : ofstream_(path), stream_(ofstream_), BaseLogger(ofstream_) {}
+
+        explicit FileLogger(const std::string & path, Logger_level lvl) : ofstream_(path), stream_(ofstream_), BaseLogger(ofstream_) {
+            level_ = lvl;
+        }
 
         ~FileLogger();
 
         void open(const std::string &path);
-
         void close();
-
-        void flush() override;
     };
 
 }

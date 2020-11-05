@@ -5,6 +5,7 @@
 #include "FileLogger.h"
 #include "StdoutLogger.h"
 #include "StderrLogger.h"
-#include "Descriptor.h"
+#include "Logger.h"
+#include "Global.h"
 
 #endif //HW_2_LOG_H
