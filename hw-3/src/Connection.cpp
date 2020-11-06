@@ -1,4 +1,5 @@
 #include "Connection.h"
+#include <iostream>
 
 namespace tcp {
 
@@ -20,40 +21,30 @@ namespace tcp {
         dscrptr_.set_fd(socket);
     }
 
-    Connection::~Connection() {
-        ::close(dscrptr_.get_fd());
+    void Connection::connect_(unsigned addr, unsigned port) {
+        dscrptr_.set_fd(socket(AF_INET, SOCK_STREAM, 0));
+        if (!dscrptr_.is_valid()) {
+            throw TcpException("Socket init error");
+        }
+        sockaddr_in addr_in{};
+        addr_in.sin_family = AF_INET;
+        addr_in.sin_port = ::htons(port);
+        addr_in.sin_addr = { addr };
+        if (::connect(dscrptr_.get_fd(), reinterpret_cast <sockaddr*>(&addr_in), sizeof(addr_in))) {
+            throw TcpException("Connect error");
+        }
     }
 
     void Connection::connect(const std::string & addr, unsigned port) {
-        dscrptr_.close();
-        dscrptr_.set_fd(socket(AF_INET, SOCK_STREAM, 0));
-        if (dscrptr_.get_fd() == -1) {
-            throw std::runtime_error("Socket init error\n");
-        }
         sockaddr_in addr_in{};
-        addr_in.sin_family = AF_INET;
-        addr_in.sin_port = ::htons(port);
         if (::inet_aton(addr.data(), &addr_in.sin_addr) == 0) {
-            throw std::runtime_error("Incorrect port\n");
+            throw TcpException("Incorrect ip");
         }
-        if (::connect(dscrptr_.get_fd(), reinterpret_cast <sockaddr*>(&addr_in), sizeof(addr_in))) {
-            throw std::runtime_error("Connect error\n");
-        }
+        connect_(addr_in.sin_addr.s_addr, port);
     }
 
     void Connection::connect(unsigned addr, unsigned port) {
-        dscrptr_.close();
-        dscrptr_.set_fd(socket(AF_INET, SOCK_STREAM, 0));
-        if (dscrptr_.get_fd() == -1) {
-            throw std::runtime_error("Socket init error\n");
-        }
-        sockaddr_in addr_in{};
-        addr_in.sin_family = AF_INET;
-        addr_in.sin_port = ::htons(port);
-        addr_in.sin_addr = { ::htonl(addr) };
-        if (::connect(dscrptr_.get_fd(), reinterpret_cast <sockaddr*>(&addr_in), sizeof(addr_in))) {
-            throw std::runtime_error("Connect error\n");
-        }
+        connect_(::htonl(addr), port);
     }
 
     void Connection::close() {
@@ -80,15 +71,15 @@ namespace tcp {
         timeval timeout{ .tv_sec = ms / 1000, .tv_usec = ms % 1000};
         if (setsockopt(dscrptr_.get_fd(), SOL_SOCKET, opt,
                        &timeout, sizeof(timeout)) == -1) {
-            throw std::runtime_error("Socket option set error\n");
+            throw TcpException("Socket option set error");
         }
         timeval get_timeout = {};
         socklen_t tmp = sizeof(timeout);
         if (getsockopt(dscrptr_.get_fd(), SOL_SOCKET, opt, &get_timeout, &tmp) == -1) {
-            throw std::runtime_error("Socket option get error\n");
+            throw TcpException("Socket option get error");
         }
         if (timeout.tv_usec != get_timeout.tv_usec || timeout.tv_sec != get_timeout.tv_sec) {
-            throw std::runtime_error("Failed to set timeout\n");
+            throw TcpException("Failed to set timeout");
         }
     }
 

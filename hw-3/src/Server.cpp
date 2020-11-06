@@ -1,4 +1,5 @@
 #include "Server.h"
+#include <iostream>
 
 namespace tcp {
 
@@ -17,67 +18,52 @@ namespace tcp {
         *this = std::move(other);
     }
 
-    void Server::listen(const std::string & addr, unsigned port,
-                   int max_connection) {
-        close();
-        dscrptr_.set_fd(::socket(AF_INET, SOCK_STREAM, 0));
-        if (dscrptr_.get_fd() == -1) {
-            throw std::runtime_error("Socket init error\n");
+    void Server::listen_(unsigned addr, unsigned port, int max_connection) {
+        Descriptor fd(::socket(AF_INET, SOCK_STREAM, 0));
+        if (!fd.is_valid()) {
+            throw TcpException("Socket init error");
         }
         int opt = 1;
-        if (::setsockopt(dscrptr_.get_fd(), SOL_SOCKET,
-                         SO_REUSEADDR, &opt, sizeof(opt)) == -1) {
-            throw std::runtime_error("Set socket options error\n");
+        if (::setsockopt(fd.get_fd(), SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1) {
+            throw TcpException("Set socket options error");
         }
-        addr_in_.sin_family = AF_INET;
-        addr_in_.sin_port = ::htons(port);
-        if (::inet_aton(addr.data(), &addr_in_.sin_addr) == 0) {
-            throw std::runtime_error("Incorrect ip\n");
+        sockaddr_in addr_in{};
+        addr_in.sin_family = AF_INET;
+        addr_in.sin_port = ::htons(port);
+        addr_in.sin_addr = { addr };
+        if (::bind(fd.get_fd(), reinterpret_cast<sockaddr*>(&addr_in), sizeof(addr_in)) == -1) {
+            throw TcpException("Bind error");
         }
-        if (bind(dscrptr_.get_fd(), reinterpret_cast<sockaddr*>(&addr_in_),
-                 sizeof(addr_in_)) == -1) {
-            throw std::runtime_error("Bind error\n");
+        if (::listen(fd.get_fd(), max_connection) == -1) {
+            throw TcpException("Listen error");
         }
-        if (::listen(dscrptr_.get_fd(), max_connection) == -1) {
-            throw std::runtime_error("Listen error\n");
-        }
+
+        dscrptr_ = std::move(fd);
+        addr_in_ = addr_in;
     }
 
-    void Server::listen(unsigned addr, unsigned port,
-                        int max_connection) {
-        close();
-        dscrptr_.set_fd(::socket(AF_INET, SOCK_STREAM, 0));
-        if (dscrptr_.get_fd() == -1) {
-            throw std::runtime_error("Socket init error\n");
+    void Server::listen(const std::string & addr, unsigned port, int max_connection) {
+        sockaddr_in addr_in{};
+        if (::inet_aton(addr.data(), &addr_in.sin_addr) == 0) {
+            throw TcpException("Incorrect ip");
         }
-        int opt = 1;
-        if (::setsockopt(dscrptr_.get_fd(), SOL_SOCKET,
-                         SO_REUSEADDR, &opt, sizeof(opt)) == -1) {
-            throw std::runtime_error("Set socket options error\n");
-        }
-        addr_in_.sin_family = AF_INET;
-        addr_in_.sin_port = ::htons(port);
-        addr_in_.sin_addr = { ::htonl(addr) };
-        if (bind(dscrptr_.get_fd(), reinterpret_cast<sockaddr*>(&addr_in_),
-                 sizeof(addr_in_)) == -1) {
-            throw std::runtime_error("Bind error\n");
-        }
-        if (::listen(dscrptr_.get_fd(), max_connection) == -1) {
-            throw std::runtime_error("Listen error\n");
-        }
+        listen_(addr_in.sin_addr.s_addr, port, max_connection);
+    }
+
+    void Server::listen(unsigned addr, unsigned port, int max_connection) {
+        listen_(::htonl(addr), port, max_connection);
     }
 
     Connection Server::accept() {
         sockaddr_in client_addr = {};
         socklen_t addr_size = sizeof(client_addr);
-        int acc_socket = ::accept(dscrptr_.get_fd(),
-                                  reinterpret_cast<sockaddr*>(&client_addr),
-                                  &addr_size);
+
+        int acc_socket = ::accept(dscrptr_.get_fd(), reinterpret_cast<sockaddr*>(&client_addr), &addr_size);
         if (acc_socket == -1) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                return Connection();
+                throw TcpException("Accept would block");
             }
-            throw std::runtime_error("Accept error\n");
+            throw TcpException("Accept error");
         }
         return Connection(acc_socket);
     }
@@ -87,22 +73,10 @@ namespace tcp {
     }
 
     void Server::set_max_connection(int new_max) {
-        close();
-        dscrptr_.set_fd(::socket(AF_INET, SOCK_STREAM, 0));
-        if (dscrptr_.get_fd() == -1) {
-            throw std::runtime_error("Socket init error\n");
-        }
-        int opt = 1;
-        if (::setsockopt(dscrptr_.get_fd(), SOL_SOCKET,
-                         SO_REUSEADDR, &opt, sizeof(opt)) == -1) {
-            throw std::runtime_error("Set socket options error\n");
-        }
-        if (bind(dscrptr_.get_fd(), reinterpret_cast<sockaddr*>(&addr_in_),
-                 sizeof(addr_in_)) == -1) {
-            throw std::runtime_error("Bind error\n");
-        }
-        if (::listen(dscrptr_.get_fd(), new_max) == -1) {
-            throw std::runtime_error("Listen error\n");
+        if (dscrptr_.is_valid()) {
+            if (::listen(dscrptr_.get_fd(), new_max) == -1) {
+                throw TcpException("Listen error");
+            }
         }
     }
 
@@ -110,15 +84,7 @@ namespace tcp {
         timeval timeout{ .tv_sec = ms / 1000, .tv_usec = ms % 1000};
         if (setsockopt(dscrptr_.get_fd(), SOL_SOCKET, opt,
                        &timeout, sizeof(timeout)) == -1) {
-            throw std::runtime_error("Socket option set error\n");
-        }
-        timeval get_timeout = {};
-        socklen_t tmp = sizeof(timeout);
-        if (getsockopt(dscrptr_.get_fd(), SOL_SOCKET, opt, &get_timeout, &tmp) == -1) {
-            throw std::runtime_error("Socket option get error\n");
-        }
-        if (timeout.tv_usec != get_timeout.tv_usec || timeout.tv_sec != get_timeout.tv_sec) {
-            throw std::runtime_error("Failed to set timeout\n");
+            throw TcpException("Socket option set error");
         }
     }
 
@@ -129,6 +95,7 @@ namespace tcp {
 
     Server & Server::operator=(Server &&other) noexcept {
         dscrptr_ = std::move(other.dscrptr_);
+        addr_in_ = other.addr_in_;
         return *this;
     }
 

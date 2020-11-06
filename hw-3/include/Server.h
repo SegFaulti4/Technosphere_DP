@@ -2,6 +2,7 @@
 #define HW_3_SERVER_H
 
 #include "Connection.h"
+#include "TcpException.h"
 
 namespace tcp {
 
@@ -10,6 +11,7 @@ namespace tcp {
         Descriptor dscrptr_;
         sockaddr_in addr_in_ = {};
         void set_timeout_(ssize_t ms, int opt);
+        void listen_(unsigned addr, unsigned port, int max_connection);
 
     public:
         Server();

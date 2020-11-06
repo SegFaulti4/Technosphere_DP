@@ -17,10 +17,10 @@ namespace tcp {
     }
 
     void Descriptor::close() {
-        if (fd_ != -1) {
+        if (is_valid()) {
             if (::close(fd_) == -1) {
                 fd_ = -1;
-                throw std::runtime_error("Close error\n");
+                throw TcpException("Close error");
             }
             fd_ = -1;
         }
@@ -36,30 +36,30 @@ namespace tcp {
     }
 
     size_t Descriptor::read(void *data, size_t count) const {
-        if (fd_ == -1) {
-            throw std::runtime_error("Read from invalid descriptor\n");
+        if (!is_valid()) {
+            throw TcpException("Read from invalid descriptor");
         }
         ssize_t res = ::read(fd_, data, count);
         if (res == -1) {
             if (errno != EAGAIN && errno != EWOULDBLOCK) {
-                throw std::runtime_error("Read error\n");
+                throw TcpException("Read error");
             } else {
-                res = 0;
+                throw TcpException("Read would block");
             }
         }
         return res;
     }
 
     size_t Descriptor::write(const void *data, size_t count) const {
-        if (fd_ == -1) {
-            throw std::runtime_error("Write to invalid descriptor\n");
+        if (!is_valid()) {
+            throw TcpException("Write to invalid descriptor");
         }
         ssize_t res = ::write(fd_, data, count);
         if (res == -1) {
             if (errno != EAGAIN && errno != EWOULDBLOCK) {
-                throw std::runtime_error("Write error\n");
+                throw TcpException("Write error");
             } else {
-                res = 0;
+                throw TcpException("Write would block");
             }
         }
         return res;
@@ -70,7 +70,7 @@ namespace tcp {
         size_t res;
         while (cur < len) {
             if (!(res = write(static_cast<const char *>(data) + cur, len - cur))) {
-                break;
+                throw TcpException("Write exact failed");
             }
             cur += res;
         }
@@ -81,7 +81,7 @@ namespace tcp {
         size_t res;
         while (cur < len) {
             if (!(res = read(static_cast<char *>(data) + cur, len - cur))) {
-                break;
+                throw TcpException("Read exact failed");
             }
             cur += res;
         }
@@ -90,10 +90,13 @@ namespace tcp {
     Descriptor &Descriptor::operator=(Descriptor &&other) noexcept {
         if (this != &other) {
             close();
-            fd_ = other.fd_;
-            other.fd_ = -1;
+            fd_ = std::exchange(other.fd_, -1);
         }
         return *this;
+    }
+
+    bool Descriptor::is_valid() const {
+        return fd_ != -1;
     }
 
 }
