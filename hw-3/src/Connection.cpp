@@ -69,17 +69,9 @@ namespace tcp {
 
     void Connection::set_timeout_(ssize_t ms, int opt) {
         timeval timeout{ .tv_sec = ms / 1000, .tv_usec = ms % 1000};
-        if (setsockopt(dscrptr_.get_fd(), SOL_SOCKET, opt,
+        if (::setsockopt(dscrptr_.get_fd(), SOL_SOCKET, opt,
                        &timeout, sizeof(timeout)) == -1) {
             throw TcpException("Socket option set error");
-        }
-        timeval get_timeout = {};
-        socklen_t tmp = sizeof(timeout);
-        if (getsockopt(dscrptr_.get_fd(), SOL_SOCKET, opt, &get_timeout, &tmp) == -1) {
-            throw TcpException("Socket option get error");
-        }
-        if (timeout.tv_usec != get_timeout.tv_usec || timeout.tv_sec != get_timeout.tv_sec) {
-            throw TcpException("Failed to set timeout");
         }
     }
 

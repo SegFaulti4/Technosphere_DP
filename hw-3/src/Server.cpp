@@ -82,7 +82,7 @@ namespace tcp {
 
     void Server::set_timeout_(ssize_t ms, int opt) {
         timeval timeout{ .tv_sec = ms / 1000, .tv_usec = ms % 1000};
-        if (setsockopt(dscrptr_.get_fd(), SOL_SOCKET, opt,
+        if (::setsockopt(dscrptr_.get_fd(), SOL_SOCKET, opt,
                        &timeout, sizeof(timeout)) == -1) {
             throw TcpException("Socket option set error");
         }
