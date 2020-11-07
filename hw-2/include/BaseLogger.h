@@ -16,9 +16,11 @@ namespace log {
     };
 
     class BaseLogger {
-    protected:
+    private:
         std::ostream& stream_;
-        Logger_level level_ = LL_DEBUG;
+
+    protected:
+        Logger_level level_ = LL_INFO;
         void log(const std::string & what, Logger_level lvl);
         std::vector<std::string> LOGGER_LEVEL_OUT_TABLE = {
                 "error: ",
@@ -35,7 +37,7 @@ namespace log {
         void warn(const std::string & what);
         void error(const std::string & what);
         void set_level(Logger_level lvl);
-        int level();
+        int level() const;
         void flush();
     };
 

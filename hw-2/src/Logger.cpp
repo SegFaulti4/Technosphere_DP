@@ -8,7 +8,7 @@ namespace log {
     }
 
     BaseLogger& Logger::get_global_logger() {
-        if (global_logger_ == NULL) {
+        if (global_logger_ == nullptr) {
             throw std::runtime_error("Trying to return invalid logger\n");
         }
         return *global_logger_;

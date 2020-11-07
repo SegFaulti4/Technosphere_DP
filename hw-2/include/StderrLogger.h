@@ -7,9 +7,6 @@
 namespace log {
 
     class StderrLogger : public BaseLogger {
-    private:
-        std::ostream& stream_ = std::cerr;
-
     public:
         StderrLogger() : BaseLogger(std::cerr) {}
 

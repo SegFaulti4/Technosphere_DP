@@ -12,16 +12,13 @@ namespace log {
     class FileLogger : public BaseLogger {
     private:
         std::ofstream ofstream_;
-        std::ofstream& stream_;
 
     public:
-        explicit FileLogger(const std::string & path) : ofstream_(path), stream_(ofstream_), BaseLogger(ofstream_) {}
+        explicit FileLogger(const std::string & path) : ofstream_(path), BaseLogger(ofstream_) {}
 
-        explicit FileLogger(const std::string & path, Logger_level lvl) : ofstream_(path), stream_(ofstream_), BaseLogger(ofstream_) {
+        explicit FileLogger(const std::string & path, Logger_level lvl) : ofstream_(path), BaseLogger(ofstream_) {
             level_ = lvl;
         }
-
-        ~FileLogger();
 
         void open(const std::string &path);
         void close();

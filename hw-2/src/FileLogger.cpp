@@ -3,18 +3,11 @@
 namespace log {
 
     void FileLogger::open(const std::string &path) {
-        stream_.open(path);
+        ofstream_.open(path);
     }
 
     void FileLogger::close() {
-        stream_.close();
-    }
-
-    FileLogger::~FileLogger() {
-        try {
-            stream_.close();
-        }
-        catch (int) {}
+        ofstream_.close();
     }
 
 }

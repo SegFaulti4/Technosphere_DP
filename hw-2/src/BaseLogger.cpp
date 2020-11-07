@@ -22,13 +22,13 @@ namespace log {
         level_ = lvl;
     }
 
-    int BaseLogger::level() {
+    int BaseLogger::level() const {
         return level_;
     }
 
     void BaseLogger::log(const std::string &what, Logger_level lvl) {
         if (level_ >= lvl) {
-            stream_ << LOGGER_LEVEL_OUT_TABLE[lvl] << what << std::endl;
+            stream_ << LOGGER_LEVEL_OUT_TABLE[lvl] << what << "\n";
         }
     }
 
