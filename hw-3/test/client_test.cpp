@@ -14,7 +14,7 @@ int main() {
             std::cout << std::string(buf, res) << std::flush;
         }
     } catch (tcp::TcpException & exc) {
-        std::cout << exc.getError() << std::endl;
+        std::cout << exc.what() << std::endl;
     }
     return 0;
 }

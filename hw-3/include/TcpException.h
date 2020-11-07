@@ -3,17 +3,18 @@
 
 #include <string>
 #include <utility>
+#include <stdexcept>
 
 namespace tcp {
 
-    class TcpException : std::exception {
-    private:
-        std::string m_error;
-
+    class TcpException : public std::runtime_error {
     public:
-        explicit TcpException(std::string error) : m_error(std::move(error)) {};
+        using std::runtime_error::runtime_error;
+    };
 
-        const char *getError() { return m_error.data(); }
+    class TcpTimeoutException : public TcpException {
+    public:
+        using TcpException::TcpException;
     };
 
 }

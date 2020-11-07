@@ -61,7 +61,7 @@ namespace tcp {
         int acc_socket = ::accept(dscrptr_.get_fd(), reinterpret_cast<sockaddr*>(&client_addr), &addr_size);
         if (acc_socket == -1) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                throw TcpException("Accept would block");
+                throw TcpTimeoutException("Accept would block");
             }
             throw TcpException("Accept error");
         }

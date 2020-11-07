@@ -12,7 +12,7 @@ int main() {
         std::string str = "Hello World!";
         con.write(str.data(), str.size());
     } catch (tcp::TcpException & exc) {
-        std::cout << exc.getError() << std::endl;
+        std::cout << exc.what() << std::endl;
     }
     return 0;
 }
