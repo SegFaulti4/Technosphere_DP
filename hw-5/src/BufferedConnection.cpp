@@ -51,12 +51,11 @@ namespace net {
     }
 
     void BufferedConnection::buf_write() {
-        size_t res = connection_.write(tmp_, sizeof(tmp_));
+        size_t res = connection_.write(write_buf_.data(), sizeof(tmp_));
         if (!res) {
             throw NetException("Nothing was written");
         }
-        read_buf_.resize(read_buf_.size() + res);
-        read_buf_.insert(read_buf_.begin() + read_buf_.size(), tmp_, &tmp_[res - 1]);
+        write_buf_.erase(write_buf_.begin(), write_buf_.begin() + res);
     }
 
     std::string & BufferedConnection::get_read_buf() {
