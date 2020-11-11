@@ -1,11 +1,14 @@
 cmake_minimum_required(VERSION 3.17)
 project(shmem)
 
+set(CMAKE_CXX_FLAGS -pthread)
 set(CMAKE_CXX_STANDARD 17)
 set(PROJECT_INCLUDE include)
-set(PROJECT_SRC src/SharedAllocator.cpp src/Semaphore.cpp)
+set(PROJECT_SRC src/SharedAllocator.cpp src/Semaphore.cpp src/SharedMem.cpp)
 
-add_executable(${PROJECT_NAME} main.cpp)
-target_compile_options(${PROJECT_NAME} PUBLIC -lpthread -pthread -lm -lrt)
+add_library(${PROJECT_NAME} STATIC ${PROJECT_SRC})
 target_include_directories(${PROJECT_NAME} PUBLIC ${PROJECT_INCLUDE})
-target_sources(${PROJECT_NAME} PUBLIC ${PROJECT_SRC})
+
+add_executable(test main.cpp)
+target_link_libraries(test PUBLIC ${PROJECT_NAME})
+target_include_directories(test PUBLIC ${PROJECT_INCLUDE})

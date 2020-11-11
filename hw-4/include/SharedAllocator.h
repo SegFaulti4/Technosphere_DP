@@ -3,69 +3,79 @@
 
 #include <iostream>
 #include <memory>
-#include <cmath>
 #include <cstring>
+#include <cmath>
 #include <functional>
 #include <sys/mman.h>
 #include "Semaphore.h"
 
-constexpr char USED_BLOCK = '1';
-constexpr char FREE_BLOCK = '0';
+namespace shmem {
 
-size_t get_size_in_blocks(size_t bytes, size_t block_size);
+    constexpr char USED_BLOCK = '1';
+    constexpr char FREE_BLOCK = '0';
 
-size_t find_free_blocks(size_t blocks_count, const std::string_view &used_table);
+    size_t get_size_in_blocks(size_t bytes, size_t block_size);
 
-struct ShMemState {
-    size_t blocks_count;
-    size_t block_size;
-    Semaphore sem;
-    char *used_blocks_table;
-    char *first_block;
-};
+    size_t find_free_blocks(size_t blocks_count, const std::string_view &used_table);
 
-template<typename T>
-class SharedAllocator {
-public:
-    char *mmap_;
+    struct ShMemState {
+        size_t blocks_count;
+        size_t block_size;
+        Semaphore sem;
+        char *used_blocks_table;
+        char *first_block;
+    };
 
-    typedef T value_type;
+    template<class T>
+    class SharedAllocator {
+    private:
+        ShMemState *state_;
 
-    explicit SharedAllocator(char *mmap)
-            : mmap_ {mmap} {}
+    public:
+        typedef T value_type;
 
-    template<class U>
-    SharedAllocator(const SharedAllocator<U>& other) noexcept {
-        mmap_ = other.mmap_;
-    }
+        explicit SharedAllocator(ShMemState *state) {
+            state_ = state;
+        }
 
-    T* allocate(std::size_t n) {
-        ShMemState* state = reinterpret_cast<ShMemState*>(mmap_);
+        template<class U>
+        SharedAllocator(const SharedAllocator<U> &other) noexcept {
+            state_ = other.state_;
+        }
 
-        size_t blocks_needed = get_size_in_blocks(sizeof(T) * n, state->block_size);
-        std::string_view table{state->used_blocks_table, state->blocks_count};
-        size_t blocks_pos = find_free_blocks(blocks_needed, table);
-        ::memset(state->used_blocks_table + blocks_pos, USED_BLOCK, blocks_needed);
-        return reinterpret_cast<T*>(state->first_block + blocks_pos * state->block_size);
-    }
+        T *allocate(std::size_t n) {
+            SemLock(state_->sem);
+            size_t blocks_needed = get_size_in_blocks(sizeof(T) * n, state_->block_size);
+            std::string_view table{state_->used_blocks_table, state_->blocks_count};
+            size_t blocks_pos = find_free_blocks(blocks_needed, table);
+            ::memset(state_->used_blocks_table + blocks_pos, USED_BLOCK, blocks_needed);
+            return reinterpret_cast<T *>(state_->first_block + blocks_pos * state_->block_size);
+        }
 
-    void deallocate(T* p, std::size_t n) noexcept {
-        ShMemState* state = reinterpret_cast<ShMemState*>(mmap_);
+        void deallocate(T *p, std::size_t n) noexcept {
+            SemLock(state_->sem);
+            size_t offset = (reinterpret_cast<char *>(p) - state_->first_block) / state_->block_size;
+            size_t blocks_count = get_size_in_blocks(sizeof(T) * n, state_->block_size);
+            ::memset(state_->used_blocks_table + offset, FREE_BLOCK, blocks_count);
+        }
 
-        size_t offset = (reinterpret_cast<char*>(p) - state->first_block) / state->block_size;
-        size_t blocks_count = get_size_in_blocks(sizeof(T) * n, state->block_size);
-        ::memset(state->used_blocks_table + offset, FREE_BLOCK, blocks_count);
-    }
-};
+        friend class SharedMem;
 
-template<class T, class U>
-bool operator==(const SharedAllocator<T> &a, const SharedAllocator<U> &b);
+        template<class V>
+        friend
+        class SharedAllocator;
 
-template<class T, class U>
-bool operator!=(const SharedAllocator<T> &a, const SharedAllocator<U> &b);
+        template<typename Key, typename V>
+        friend
+        class SharedMap;
+    };
 
-using CharAlloc = SharedAllocator<char>;
-using ShString = std::basic_string<char, std::char_traits<char>, CharAlloc>;
-using ShUPtr = std::unique_ptr<char, std::function<void(char *)>>;
+    template<class T, class U>
+    bool operator==(const SharedAllocator<T> &a, const SharedAllocator<U> &b);
+
+    template<class T, class U>
+    bool operator!=(const SharedAllocator<T> &a, const SharedAllocator<U> &b);
+
+}
 
 #endif //HW_4_SHAREDALLOCATOR_H

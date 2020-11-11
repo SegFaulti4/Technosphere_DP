@@ -6,26 +6,31 @@
 #include <stdexcept>
 #include <pthread.h>
 
-class Semaphore {
-private:
-    sem_t sem_;
+namespace shmem {
 
-public:
-    Semaphore();
+    class Semaphore {
+    private:
+        sem_t sem_;
 
-    void post();
-    void wait();
-    void destroy();
+    public:
+        Semaphore();
 
-    friend class SemLock;
-};
+        void destroy();
 
-class SemLock {
-private:
-    Semaphore * sem_;
-public:
-    explicit SemLock(Semaphore * sem);
-    ~SemLock();
-};
+        void post();
+
+        void wait();
+    };
+
+    class SemLock {
+    private:
+        Semaphore &sem_;
+    public:
+        explicit SemLock(Semaphore &sem);
+
+        ~SemLock();
+    };
+
+}
 
 #endif //SHMEM_SEMAPHORE_H
