@@ -3,7 +3,7 @@
 
 int main() {
     std::string str[] = {"I'm ", "blinded ", "by ", "the lights"};
-    log::FileLogger SL1("out1.txt", log::LL_DEBUG);
+    log::FileLogger SL1("out1.txt");
     SL1.debug(str[0]);
     SL1.info(str[1]);
     SL1.warn(str[2]);

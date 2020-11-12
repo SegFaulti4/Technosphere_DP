@@ -18,9 +18,9 @@ namespace log {
     class BaseLogger {
     private:
         std::ostream& stream_;
+        Logger_level level_;
 
     protected:
-        Logger_level level_ = LL_INFO;
         void log(const std::string & what, Logger_level lvl);
         std::vector<std::string> LOGGER_LEVEL_OUT_TABLE = {
                 "error: ",
@@ -28,10 +28,9 @@ namespace log {
                 "info: ",
                 "debug: "
         };
+        explicit BaseLogger(std::ostream & stream, Logger_level level = LL_INFO) : stream_(stream), level_(level) {}
 
     public:
-        explicit BaseLogger(std::ostream & stream):stream_(stream) {}
-
         void debug(const std::string & what);
         void info(const std::string & what);
         void warn(const std::string & what);

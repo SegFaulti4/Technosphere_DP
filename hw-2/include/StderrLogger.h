@@ -10,9 +10,7 @@ namespace log {
     public:
         StderrLogger() : BaseLogger(std::cerr) {}
 
-        explicit StderrLogger(Logger_level lvl) : BaseLogger(std::cerr) {
-            level_ = lvl;
-        }
+        explicit StderrLogger(Logger_level lvl) : BaseLogger(std::cerr, lvl) {}
     };
 
 }
