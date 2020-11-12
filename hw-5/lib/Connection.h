@@ -6,6 +6,7 @@
 #include <netinet/ip.h>
 #include <arpa/inet.h>
 #include <string>
+#include <climits>
 #include "TcpException.h"
 #include "Descriptor.h"
 
@@ -13,7 +14,7 @@ namespace tcp {
 
     class Connection {
     private:
-        Descriptor dscrptr_;
+        Descriptor descriptor_;
         explicit Connection(int socket);
         void set_timeout_(ssize_t ms, int opt);
         void connect_(unsigned addr, unsigned port);
@@ -34,9 +35,14 @@ namespace tcp {
         void readExact(void *buf, size_t count);
         void writeExact(const void *buf, size_t count);
         void set_timeout(ssize_t ms);
-        const Descriptor & get_descriptor();
+        [[nodiscard]] const Descriptor & get_descriptor() const;
 
         friend class Server;
+        /*
+            Server используем приватный конструктор Connection,
+            принимающий на вход сокет, давать пользователю в руки
+            такой метод будет небезопасно.
+        */
     };
 
 }

@@ -1,5 +1,4 @@
 #include "Connection.h"
-#include <iostream>
 
 namespace tcp {
 
@@ -18,19 +17,22 @@ namespace tcp {
     }
 
     Connection::Connection(int socket) {
-        dscrptr_.set_fd(socket);
+        descriptor_.set_fd(socket);
     }
 
     void Connection::connect_(unsigned addr, unsigned port) {
-        dscrptr_.set_fd(socket(AF_INET, SOCK_STREAM, 0));
-        if (!dscrptr_.is_valid()) {
+        if (port > USHRT_MAX) {
+            throw std::runtime_error("Wrong port number");
+        }
+        descriptor_.set_fd(socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0));
+        if (!descriptor_.is_valid()) {
             throw TcpException("Socket init error");
         }
         sockaddr_in addr_in{};
         addr_in.sin_family = AF_INET;
         addr_in.sin_port = ::htons(port);
         addr_in.sin_addr = { addr };
-        if (::connect(dscrptr_.get_fd(), reinterpret_cast <sockaddr*>(&addr_in), sizeof(addr_in))) {
+        if (::connect(descriptor_.get_fd(), reinterpret_cast <sockaddr*>(&addr_in), sizeof(addr_in))) {
             throw TcpException("Connect error");
         }
     }
@@ -48,38 +50,30 @@ namespace tcp {
     }
 
     void Connection::close() {
-        dscrptr_.close();
+        descriptor_.close();
     }
 
     size_t Connection::read(void *buf, size_t count) {
-        return dscrptr_.read(buf, count);
+        return descriptor_.read(buf, count);
     }
 
     size_t Connection::write(const void *buf, size_t count) {
-        return dscrptr_.write(buf, count);
+        return descriptor_.write(buf, count);
     }
 
     void Connection::readExact(void *buf, size_t count) {
-        dscrptr_.readExact(buf, count);
+        descriptor_.readExact(buf, count);
     }
 
     void Connection::writeExact(const void *buf, size_t count) {
-        dscrptr_.writeExact(buf, count);
+        descriptor_.writeExact(buf, count);
     }
 
     void Connection::set_timeout_(ssize_t ms, int opt) {
         timeval timeout{ .tv_sec = ms / 1000, .tv_usec = ms % 1000};
-        if (setsockopt(dscrptr_.get_fd(), SOL_SOCKET, opt,
+        if (setsockopt(descriptor_.get_fd(), SOL_SOCKET, opt,
                        &timeout, sizeof(timeout)) == -1) {
             throw TcpException("Socket option set error");
-        }
-        timeval get_timeout = {};
-        socklen_t tmp = sizeof(timeout);
-        if (getsockopt(dscrptr_.get_fd(), SOL_SOCKET, opt, &get_timeout, &tmp) == -1) {
-            throw TcpException("Socket option get error");
-        }
-        if (timeout.tv_usec != get_timeout.tv_usec || timeout.tv_sec != get_timeout.tv_sec) {
-            throw TcpException("Failed to set timeout");
         }
     }
 
@@ -89,12 +83,12 @@ namespace tcp {
     }
 
     Connection & Connection::operator=(Connection && other) noexcept {
-        this->dscrptr_ = std::move(other.dscrptr_);
+        this->descriptor_ = std::move(other.descriptor_);
         return *this;
     }
 
-    const Descriptor & Connection::get_descriptor() {
-        return dscrptr_;
+    const Descriptor & Connection::get_descriptor() const {
+        return descriptor_;
     }
 
 }

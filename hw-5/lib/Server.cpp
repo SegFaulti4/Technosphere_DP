@@ -1,5 +1,4 @@
 #include "Server.h"
-#include <iostream>
 
 namespace tcp {
 
@@ -38,7 +37,7 @@ namespace tcp {
             throw TcpException("Listen error");
         }
 
-        dscrptr_ = std::move(fd);
+        descriptor_ = std::move(fd);
         addr_in_ = addr_in;
     }
 
@@ -58,10 +57,11 @@ namespace tcp {
         sockaddr_in client_addr = {};
         socklen_t addr_size = sizeof(client_addr);
 
-        int acc_socket = ::accept(dscrptr_.get_fd(), reinterpret_cast<sockaddr*>(&client_addr), &addr_size);
+        int acc_socket = ::accept4(descriptor_.get_fd(),reinterpret_cast<sockaddr*>(&client_addr),
+                                  &addr_size, SOCK_NONBLOCK);
         if (acc_socket == -1) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                throw TcpTimeoutException("Accept would block");
+                throw TcpBlockException("Accept would block");
             }
             throw TcpException("Accept error");
         }
@@ -69,12 +69,12 @@ namespace tcp {
     }
 
     void Server::close() {
-        dscrptr_.close();
+        descriptor_.close();
     }
 
     void Server::set_max_connection(int new_max) {
-        if (dscrptr_.is_valid()) {
-            if (::listen(dscrptr_.get_fd(), new_max) == -1) {
+        if (descriptor_.is_valid()) {
+            if (::listen(descriptor_.get_fd(), new_max) == -1) {
                 throw TcpException("Listen error");
             }
         }
@@ -82,7 +82,7 @@ namespace tcp {
 
     void Server::set_timeout_(ssize_t ms, int opt) {
         timeval timeout{ .tv_sec = ms / 1000, .tv_usec = ms % 1000};
-        if (setsockopt(dscrptr_.get_fd(), SOL_SOCKET, opt,
+        if (setsockopt(descriptor_.get_fd(), SOL_SOCKET, opt,
                        &timeout, sizeof(timeout)) == -1) {
             throw TcpException("Socket option set error");
         }
@@ -94,13 +94,13 @@ namespace tcp {
     }
 
     Server & Server::operator=(Server &&other) noexcept {
-        dscrptr_ = std::move(other.dscrptr_);
+        descriptor_ = std::move(other.descriptor_);
         addr_in_ = other.addr_in_;
         return *this;
     }
 
     const Descriptor & Server::get_descriptor() {
-        return dscrptr_;
+        return descriptor_;
     }
 
 }

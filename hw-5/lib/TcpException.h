@@ -12,7 +12,7 @@ namespace tcp {
         using std::runtime_error::runtime_error;
     };
 
-    class TcpTimeoutException : public TcpException {
+    class TcpBlockException : public TcpException {
     public:
         using TcpException::TcpException;
     };

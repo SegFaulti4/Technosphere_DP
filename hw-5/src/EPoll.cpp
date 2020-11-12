@@ -1,5 +1,4 @@
 #include "EPoll.h"
-#include "NetException.h"
 
 namespace net {
 

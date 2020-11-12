@@ -17,3 +17,6 @@ target_include_directories(${PROJECT_NAME} PUBLIC ${PROJECT_INCLUDE} ${SERVER_LI
 
 add_executable(test test/test.cpp)
 target_link_libraries(test PUBLIC ${PROJECT_NAME})
+
+add_executable(write_test test/write_test.cpp)
+target_link_libraries(write_test PUBLIC ${PROJECT_NAME})

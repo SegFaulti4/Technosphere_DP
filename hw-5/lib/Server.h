@@ -8,7 +8,7 @@ namespace tcp {
 
     class Server {
     private:
-        Descriptor dscrptr_;
+        Descriptor descriptor_;
         sockaddr_in addr_in_ = {};
         void set_timeout_(ssize_t ms, int opt);
         void listen_(unsigned addr, unsigned port, int max_connection);

@@ -1,11 +1,17 @@
-#include "BufferedConnection.h"
+#include "Service.h"
 #include "NetException.h"
 
 namespace net {
 
-    BufferedConnection::BufferedConnection(tcp::Connection con, EPoll & epoll) :
-            epoll_(epoll), connection_(std::move(con)) {
+    BufferedConnection::BufferedConnection(tcp::Connection con, EPoll & epoll, Service & service) :
+            epoll_(epoll), connection_(std::move(con)), service_(service) {
         epoll_.ctl_(EPOLL_CTL_ADD, connection_.get_descriptor().get_fd(), EPOLLRDHUP);
+    }
+
+    BufferedConnection::~BufferedConnection() {
+        try {
+            epoll_.del(connection_.get_descriptor().get_fd());
+        } catch (std::exception &) {}
     }
 
     BufferedConnection& BufferedConnection::operator=(BufferedConnection && other) noexcept {
@@ -38,7 +44,7 @@ namespace net {
     }
 
     void BufferedConnection::close() {
-        connection_.close();
+        service_.closeConnection(*this);
     }
 
     void BufferedConnection::buf_read() {
@@ -46,16 +52,15 @@ namespace net {
         if (!res) {
             throw NetException("Nothing was read");
         }
-        read_buf_.resize(read_buf_.size() + res);
-        read_buf_.insert(read_buf_.begin() + read_buf_.size(), tmp_, &tmp_[res - 1]);
+        read_buf_.append(tmp_, res);
     }
 
     void BufferedConnection::buf_write() {
-        size_t res = connection_.write(write_buf_.data(), sizeof(tmp_));
+        size_t res = connection_.write(write_buf_.data(), write_buf_.size());
         if (!res) {
             throw NetException("Nothing was written");
         }
-        write_buf_.erase(write_buf_.begin(), write_buf_.begin() + res);
+        write_buf_.erase(0, res);
     }
 
     std::string & BufferedConnection::get_read_buf() {

@@ -3,6 +3,7 @@
 
 #include <sys/epoll.h>
 #include "tcp.h"
+#include "NetException.h"
 
 namespace net {
 

@@ -42,7 +42,7 @@ namespace tcp {
             if (errno != EAGAIN && errno != EWOULDBLOCK) {
                 throw TcpException("Read error");
             } else {
-                throw TcpTimeoutException("Read would block");
+                throw TcpBlockException("Read would block");
             }
         }
         return res;
@@ -57,7 +57,7 @@ namespace tcp {
             if (errno != EAGAIN && errno != EWOULDBLOCK) {
                 throw TcpException("Write error");
             } else {
-                throw TcpTimeoutException("Write would block");
+                throw TcpBlockException("Write would block");
             }
         }
         return res;
