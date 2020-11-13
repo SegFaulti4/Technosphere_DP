@@ -12,8 +12,9 @@ namespace log {
         void set_global_logger(std::unique_ptr<BaseLogger> bl);
 
         Logger(Logger const &) = delete;
+        Logger(Logger &&) = delete;
         Logger &operator=(Logger const &) = delete;
-        Logger &operator=(Logger && other) = delete;
+        Logger &operator=(Logger &&) = delete;
 
     private:
         std::unique_ptr<BaseLogger> global_logger_ = nullptr;

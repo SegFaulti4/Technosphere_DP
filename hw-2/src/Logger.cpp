@@ -15,7 +15,6 @@ namespace log {
     }
 
     void Logger::set_global_logger(std::unique_ptr<BaseLogger> bl) {
-        global_logger_.reset(nullptr);
         global_logger_ = std::move(bl);
     }
 

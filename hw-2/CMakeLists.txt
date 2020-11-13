@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.17)
 project(log)
 
 set(CMAKE_CXX_STANDARD 17)
-set(PROJECT_SRC src/BaseLogger.cpp src/FileLogger.cpp
+set(PROJECT_SRC src/BaseLogger.cpp
         src/Global.cpp src/Logger.cpp)
 set(PROJECT_INCLUDE include)
 

@@ -17,9 +17,6 @@ namespace log {
         explicit FileLogger(const std::string & path) : ofstream_(path), BaseLogger(ofstream_) {}
 
         explicit FileLogger(const std::string & path, Logger_level lvl) : ofstream_(path), BaseLogger(ofstream_, lvl) {}
-
-        void open(const std::string &path);
-        void close();
     };
 
 }
