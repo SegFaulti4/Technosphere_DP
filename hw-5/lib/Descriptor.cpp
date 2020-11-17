@@ -87,8 +87,7 @@ namespace tcp {
 
     Descriptor &Descriptor::operator=(Descriptor &&other) noexcept {
         if (this != &other) {
-            close();
-            fd_ = std::exchange(other.fd_, -1);
+            std::swap(fd_, other.fd_);
         }
         return *this;
     }
