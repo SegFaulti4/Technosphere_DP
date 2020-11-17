@@ -8,6 +8,7 @@
 #include <functional>
 #include <sys/mman.h>
 #include "Semaphore.h"
+#include "ShmemException.h"
 
 namespace shmem {
 
@@ -44,7 +45,10 @@ namespace shmem {
         }
 
         T *allocate(std::size_t n) {
-            SemLock(state_->sem);
+            if (state_ == nullptr) {
+                throw ShmemException("Invalid allocator state");
+            }
+            SemLock tmp(state_->sem);
             size_t blocks_needed = get_size_in_blocks(sizeof(T) * n, state_->block_size);
             std::string_view table{state_->used_blocks_table, state_->blocks_count};
             size_t blocks_pos = find_free_blocks(blocks_needed, table);
@@ -53,7 +57,10 @@ namespace shmem {
         }
 
         void deallocate(T *p, std::size_t n) noexcept {
-            SemLock(state_->sem);
+            if (state_ == nullptr) {
+                throw ShmemException("Invalid allocator state");
+            }
+            SemLock tmp(state_->sem);
             size_t offset = (reinterpret_cast<char *>(p) - state_->first_block) / state_->block_size;
             size_t blocks_count = get_size_in_blocks(sizeof(T) * n, state_->block_size);
             ::memset(state_->used_blocks_table + offset, FREE_BLOCK, blocks_count);
@@ -62,12 +69,10 @@ namespace shmem {
         friend class SharedMem;
 
         template<class V>
-        friend
-        class SharedAllocator;
+        friend class SharedAllocator;
 
         template<typename Key, typename V>
-        friend
-        class SharedMap;
+        friend class SharedMap;
     };
 
     template<class T, class U>

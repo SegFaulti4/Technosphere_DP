@@ -4,23 +4,25 @@ namespace shmem {
 
     Semaphore::Semaphore() {
         if (::sem_init(&sem_, 1, 1) == -1) {
-            throw std::runtime_error("Semaphore init error\n");
+            throw ShmemException("Semaphore init error\n");
         }
     }
 
     void Semaphore::destroy() {
-        ::sem_destroy(&sem_);
+        if (::sem_destroy(&sem_) == -1) {
+            throw ShmemException("Semaphore destroy error\n");
+        }
     }
 
     void Semaphore::post() {
         if (::sem_post(&sem_) == -1) {
-            throw std::runtime_error("Semaphore post error\n");
+            throw ShmemException("Semaphore post error\n");
         }
     }
 
     void Semaphore::wait() {
         if (::sem_wait(&sem_) == -1) {
-            throw std::runtime_error("Semaphore wait error\n");
+            throw ShmemException("Semaphore wait error\n");
         }
     }
 
@@ -29,7 +31,9 @@ namespace shmem {
     }
 
     SemLock::~SemLock() {
-        sem_.post();
+        try {
+            sem_.post();
+        } catch(std::exception &) {}
     }
 
 }

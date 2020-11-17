@@ -5,6 +5,7 @@
 #include <sys/sem.h>
 #include <stdexcept>
 #include <pthread.h>
+#include "ShmemException.h"
 
 namespace shmem {
 

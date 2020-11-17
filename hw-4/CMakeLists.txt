@@ -11,4 +11,3 @@ target_include_directories(${PROJECT_NAME} PUBLIC ${PROJECT_INCLUDE})
 
 add_executable(test main.cpp)
 target_link_libraries(test PUBLIC ${PROJECT_NAME})
-target_include_directories(test PUBLIC ${PROJECT_INCLUDE})

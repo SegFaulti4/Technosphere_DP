@@ -5,5 +5,6 @@
 #include "SharedAllocator.h"
 #include "SharedMem.h"
 #include "SharedMap.h"
+#include "ShmemException.h"
 
 #endif //SHMEM_SHMEM_H

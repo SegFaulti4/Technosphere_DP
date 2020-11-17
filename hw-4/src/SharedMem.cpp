@@ -2,7 +2,7 @@
 
 namespace shmem {
 
-    SharedMem::SharedMem(size_t block_size, size_t block_count) {
+    SharedMem::SharedMem(size_t block_size, size_t block_count) : alloc_(nullptr) {
         size_t header_size = sizeof(ShMemState) +
                              sizeof(*(std::declval<ShMemState>().used_blocks_table)) * block_count;
         header_size = (header_size / block_size + (header_size % block_size ? 1 : 0)) * block_size;
@@ -13,23 +13,29 @@ namespace shmem {
                                            -1, 0));
 
         if (mmap_ == MAP_FAILED) {
-            throw std::runtime_error("Mmap error\n");
+            throw ShmemException("Mmap error");
         }
 
-        auto *state = new(mmap_) ShMemState{};
+        state_ = new(mmap_) ShMemState{};
+        sem_ = &(state_->sem);
 
-        state->block_size = block_size;
-        state->blocks_count = block_count;
-        sem_ = new(&state->sem) Semaphore();
-        state->used_blocks_table = mmap_ + sizeof(*state);
-        state->first_block = mmap_ + header_size;
-        ::memset(state->used_blocks_table, FREE_BLOCK, state->blocks_count);
-        alloc_ = std::make_unique<SharedAllocator<char>>(state);
+        state_->block_size = block_size;
+        state_->blocks_count = block_count;
+        state_->used_blocks_table = mmap_ + sizeof(*state_);
+        state_->first_block = mmap_ + header_size;
+        ::memset(state_->used_blocks_table, FREE_BLOCK, state_->blocks_count);
+        alloc_.state_ = state_;
     }
 
-    SharedMem::~SharedMem() {
-        sem_->destroy();
+    void SharedMem::destroy() noexcept {
+        try {
+            sem_->destroy();
+        } catch (std::exception &) {}
         ::munmap(mmap_, size_);
+    }
+
+    SharedAllocator<char> & SharedMem::get_allocator() {
+        return alloc_;
     }
 
 }
