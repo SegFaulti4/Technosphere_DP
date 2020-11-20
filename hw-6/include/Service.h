@@ -8,23 +8,21 @@
 #include <functional>
 #include <ratio>
 #include "tcp.h"
-#include "NetException.h"
-#include "BufferedConnection.h"
+#include "HttpException.h"
+#include "HttpConnection.h"
 #include "EPoll.h"
 
 namespace http {
 
-    using ConnectionMap = std::map<int, std::unique_ptr<BufferedConnection>>;
-    using ms = std::chrono::milliseconds;
-    using HttpRequest = std::map<std::string, std::string>;
+    using ConnectionMap = std::map<int, std::unique_ptr<HttpConnection>>;
 
     class HttpServiceListener {
     public:
-        virtual void onRequest(BufferedConnection & buf_con, HttpRequest & request) = 0;
+        virtual void onRequest(HttpConnection & buf_con) = 0;
     };
 
     const size_t event_queue_size = 1024;
-    const int max_connection_time_ms = 5000;
+    const int max_downtime = 5000;
 
     class Service {
     private:
@@ -47,7 +45,7 @@ namespace http {
         void open(const std::string & addr, unsigned port, int max_connection = SOMAXCONN);
         void close();
         void run();
-        void closeConnection(BufferedConnection & buf_con);
+        void closeConnection(HttpConnection & buf_con);
     };
 
 }

@@ -59,8 +59,8 @@ namespace http {
             int events_count = accept_epoll_.wait(event_queue.data(), event_queue.size(), -1);
             for (int i = 0; i < events_count; i++) {
                 if (event_queue[i].events & EPOLLIN) {
-                    std::unique_ptr<BufferedConnection> buf_con =
-                            std::make_unique<BufferedConnection>(server_->accept(), client_epoll_, *this);
+                    std::unique_ptr<HttpConnection> buf_con =
+                            std::make_unique<HttpConnection>(server_->accept(), client_epoll_);
                     buf_con->subscribe(READWRITE);
                     int fd = buf_con->get_descriptor().get_fd();
                     connections_[fd] = std::move(buf_con);
@@ -79,46 +79,24 @@ namespace http {
         while (server_ || !connections_.empty()) {
             int events_count = client_epoll_.wait(event_queue.data(), event_queue.size(), -1);
             for (int i = 0; i < events_count; i++) {
-                BufferedConnection & buf_con = *connections_[event_queue[i].data.fd];
+                HttpConnection & buf_con = *connections_[event_queue[i].data.fd];
                 if (event_queue[i].events & EPOLLRDHUP) {   // соединения закрыто клиентом, буфер чтения не парсится
                     closeConnection_(event_queue[i].data.fd);
                 } else if (event_queue[i].events & EPOLLIN) {
-                    while (true) {
-                        int pos = buf_con.get_read_buf().size();
-                        try {
-                            buf_con.buf_read();
-                        } catch (tcp::TcpBlockException &) {
-                            break;
-                        } catch (NetException &) {
-                        } catch (std::exception &exc) {
-                            throw exc;
-                        }
-                        if (buf_con.get_read_buf().find("\r\n", pos) != std::string::npos) {
-                            HttpRequest request;
-                            // парсим
-                            if (listener_) {
-                                listener_->onRequest(buf_con, request);
-                            }
+                    buf_con.read_until_eagain();
+                    if (listener_) {
+                        if (buf_con.request_available()) {
+                            listener_->onRequest(buf_con);
                         }
                     }
                     buf_con.resubscribe();
-                    buf_con.last_used = steady_clock::now();
+                    buf_con.refresh_time();
                 } else if (event_queue[i].events & EPOLLOUT) {
-                    if (!buf_con.get_write_buf().empty()) {
-                        while (!buf_con.get_write_buf().empty()) {
-                            try {
-                                buf_con.buf_write();
-                            } catch (tcp::TcpBlockException &) {
-                                break;
-                            } catch (NetException &) {
-                            } catch (std::exception &exc) {
-                                throw exc;
-                            }
-                        }
+                    if (buf_con.write_ongoing()) {
+                        buf_con.write_until_eagain();
                         buf_con.resubscribe();
-                        buf_con.last_used = steady_clock::now();
-                    } else if (std::chrono::duration_cast<ms>(steady_clock::now() - buf_con.last_used).count()
-                                > max_connection_time_ms) {
+                        buf_con.refresh_time();
+                    } else if (buf_con.downtime_duration() > max_downtime) {
                         closeConnection_(event_queue[i].data.fd);
                     }
                 }
@@ -126,7 +104,7 @@ namespace http {
         }
     }
 
-    void Service::closeConnection(BufferedConnection & buf_con) {
+    void Service::closeConnection(HttpConnection & buf_con) {
         closeConnection_(buf_con.get_descriptor().get_fd());
     }
 

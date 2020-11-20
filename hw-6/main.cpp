@@ -3,7 +3,7 @@
 
 class ReadService : public http::HttpServiceListener {
 public:
-    void onRequest(http::BufferedConnection & buf_con, http::HttpRequest & request) {
+    void onRequest(http::HttpConnection & buf_con) {
         std::cout << buf_con.get_read_buf() << std::endl;
     }
 };

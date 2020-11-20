@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(SERVER_LIB_NAME tcp)
 set(SERVER_LIB_INCLUDE lib)
 set(SERVER_LIB_SRC lib/Connection.cpp lib/Descriptor.cpp lib/Server.cpp)
-set(PROJECT_SRC src/BufferedConnection.cpp src/EPoll.cpp src/Service.cpp)
+set(PROJECT_SRC src/HttpConnection.cpp src/EPoll.cpp src/Service.cpp)
 set(PROJECT_INCLUDE include)
 
 add_library(${SERVER_LIB_NAME} STATIC ${SERVER_LIB_SRC})

@@ -3,7 +3,7 @@
 
 #include <sys/epoll.h>
 #include "tcp.h"
-#include "NetException.h"
+#include "HttpException.h"
 
 namespace http {
 
@@ -29,7 +29,7 @@ namespace http {
         int wait(struct epoll_event *events, int max_events, int timeout);
 
         friend class Service;
-        friend class BufferedConnection;
+        friend class HttpConnection;
     };
 
 }

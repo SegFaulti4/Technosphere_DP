@@ -10,11 +10,11 @@ namespace http {
         if (::epoll_ctl(epoll_fd_.get_fd(), op, fd, &event) == -1) {
             switch(op) {
                 case EPOLL_CTL_ADD:
-                    throw NetException("Epoll add error");
+                    throw HttpException("Epoll add error");
                 case EPOLL_CTL_DEL:
-                    throw NetException("Epoll del error");
+                    throw HttpException("Epoll del error");
                 case EPOLL_CTL_MOD:
-                    throw NetException("Epoll mod error");
+                    throw HttpException("Epoll mod error");
                 default:
                     break;
             }
@@ -24,7 +24,7 @@ namespace http {
     EPoll::EPoll() {
         int epoll = epoll_create(1);
         if (epoll == -1) {
-            throw NetException("Epoll create error");
+            throw HttpException("Epoll create error");
         }
         epoll_fd_.set_fd(epoll);
     }
@@ -44,7 +44,7 @@ namespace http {
     int EPoll::wait(struct epoll_event *events, int max_events, int timeout) {
         int res = ::epoll_wait(epoll_fd_.get_fd(), events, max_events, timeout);
         if (res == -1) {
-            throw NetException("Epoll wait error");
+            throw HttpException("Epoll wait error");
         }
         return res;
     }

@@ -5,7 +5,7 @@
 
 namespace http {
 
-    class NetException : public std::runtime_error {
+    class HttpException : public std::runtime_error {
         using std::runtime_error::runtime_error;
     };
 
