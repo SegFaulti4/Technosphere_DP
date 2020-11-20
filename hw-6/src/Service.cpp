@@ -77,27 +77,34 @@ namespace http {
     void Service::worker_run_() {
         std::array<::epoll_event, event_queue_size> event_queue{};
         while (server_ || !connections_.empty()) {
-            int events_count = client_epoll_.wait(event_queue.data(), event_queue.size(), -1);
+            int events_count = client_epoll_.wait(event_queue.data(), event_queue.size(), 0);
+            std::cout << "client event: " << events_count << std::endl;
+            sleep(1);
             for (int i = 0; i < events_count; i++) {
                 HttpConnection & buf_con = *connections_[event_queue[i].data.fd];
-                if (event_queue[i].events & EPOLLRDHUP) {   // соединения закрыто клиентом, буфер чтения не парсится
+                if (event_queue[i].events & EPOLLRDHUP) {   // соединение закрыто клиентом, буфер чтения не парсится
+                    std::cout << "RDHUP" << std::endl;
                     closeConnection_(event_queue[i].data.fd);
                 } else if (event_queue[i].events & EPOLLIN) {
+                    std::cout << "IN" << std::endl;
                     buf_con.read_until_eagain();
                     if (listener_) {
                         if (buf_con.request_available()) {
                             listener_->onRequest(buf_con);
                         }
                     }
-                    buf_con.resubscribe();
                     buf_con.refresh_time();
+                    buf_con.resubscribe();
                 } else if (event_queue[i].events & EPOLLOUT) {
+                    std::cout << "OUT" << std::endl;
                     if (buf_con.write_ongoing()) {
                         buf_con.write_until_eagain();
-                        buf_con.resubscribe();
                         buf_con.refresh_time();
+                        buf_con.resubscribe();
                     } else if (buf_con.downtime_duration() > max_downtime) {
                         closeConnection_(event_queue[i].data.fd);
+                    } else {
+                        buf_con.resubscribe();
                     }
                 }
             }
