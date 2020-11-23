@@ -18,6 +18,14 @@ namespace shmem {
         CustomAllocMap *map_;
         Semaphore *sem_;
 
+        size_t remove_(const Key & key) {
+            return map_->erase(key);
+        }
+
+        int count_(const Key & key) {
+            return map_->count(key);
+        }
+
     public:
         explicit SharedMap(SharedMem & mem) {
             sem_ = new(SharedAllocator<Semaphore>(mem.get_allocator()).allocate(1))
@@ -30,28 +38,33 @@ namespace shmem {
 
         int count(const Key & key) {
             SemLock tmp(*sem_);
-            return map_->count(key);
+            return count_(key);
         }
 
         size_t remove(const Key & key) {
             SemLock tmp(*sem_);
-            return map_->erase(key);
+            return remove_(key);
         }
 
         void insert(const Key & key, const T & value) {
-            remove(key);
             SemLock tmp(*sem_);
-            map_->insert(std::make_pair(key, value));
+            auto res = map_->find(key);
+            if (res == map_->end()) {
+                map_->insert(std::make_pair(key, value));
+            } else {
+                res->second = value;
+            }
         }
 
         void update(const Key & key, const T & value) {
-            if (count(key) == 0) {
+            SemLock tmp(*sem_);
+            if (count_(key) == 0) {
                 throw ShmemException("No elements found to update");
             }
-            insert(key, value);
+            map_->at(key) = value;
         }
 
-        T get(const Key & key) {    // можно было вызвать count, но в таком случае мы ходим по map'у дважды
+        T get(const Key & key) {
             SemLock tmp(*sem_);
             auto res = map_->find(key);
             if (res == map_->end()) {

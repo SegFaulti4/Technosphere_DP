@@ -16,14 +16,4 @@ namespace shmem {
         return pos;
     }
 
-    template<class T, class U>
-    bool operator==(const SharedAllocator<T> &a, const SharedAllocator<U> &b) {
-        return a.state_ == b.state_;
-    }
-
-    template<class T, class U>
-    bool operator!=(const SharedAllocator<T> &a, const SharedAllocator<U> &b) {
-        return a.state_ != b.state_;
-    }
-
 }

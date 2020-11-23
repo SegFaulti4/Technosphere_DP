@@ -56,7 +56,7 @@ namespace shmem {
             return reinterpret_cast<T *>(state_->first_block + blocks_pos * state_->block_size);
         }
 
-        void deallocate(T *p, std::size_t n) noexcept {
+        void deallocate(T *p, std::size_t n) {
             if (state_ == nullptr) {
                 throw ShmemException("Invalid allocator state");
             }
@@ -64,6 +64,11 @@ namespace shmem {
             size_t offset = (reinterpret_cast<char *>(p) - state_->first_block) / state_->block_size;
             size_t blocks_count = get_size_in_blocks(sizeof(T) * n, state_->block_size);
             ::memset(state_->used_blocks_table + offset, FREE_BLOCK, blocks_count);
+        }
+
+        template<class U>
+                bool sameAllocator(const SharedAllocator<U> &other) const {
+            return state_ == other.state_;
         }
 
         friend class SharedMem;
@@ -76,10 +81,14 @@ namespace shmem {
     };
 
     template<class T, class U>
-    bool operator==(const SharedAllocator<T> &a, const SharedAllocator<U> &b);
+    bool operator==(const SharedAllocator<T> &a, const SharedAllocator<U> &b) {
+        return a.sameAllocator(b);
+    }
 
     template<class T, class U>
-    bool operator!=(const SharedAllocator<T> &a, const SharedAllocator<U> &b);
+    bool operator!=(const SharedAllocator<T> &a, const SharedAllocator<U> &b) {
+        return !(a == b);
+    }
 
 }
 
