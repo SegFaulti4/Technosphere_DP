@@ -1,5 +1,5 @@
-#ifndef HW_3_CONNECTION_H
-#define HW_3_CONNECTION_H
+#ifndef TCP_CONNECTION_H
+#define TCP_CONNECTION_H
 
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -47,4 +47,4 @@ namespace tcp {
 
 }
 
-#endif //HW_3_CONNECTION_H
+#endif //TCP_CONNECTION_H

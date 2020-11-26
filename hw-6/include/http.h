@@ -1,7 +1,8 @@
-#ifndef HW_6_HTTP_H
-#define HW_6_HTTP_H
+#ifndef HTTP_HTTP_H
+#define HTTP_HTTP_H
 
 #include "HttpException.h"
-#include "Service.h"
+#include "HttpConnection.h"
+#include "HttpService.h"
 
-#endif //HW_6_HTTP_H
+#endif //HTTP_HTTP_H

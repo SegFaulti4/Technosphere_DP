@@ -1,5 +1,5 @@
-#ifndef HW_3_SERVER_H
-#define HW_3_SERVER_H
+#ifndef TCP_SERVER_H
+#define TCP_SERVER_H
 
 #include "Connection.h"
 #include "TcpException.h"
@@ -9,7 +9,6 @@ namespace tcp {
     class Server {
     private:
         Descriptor descriptor_;
-        sockaddr_in addr_in_ = {};
         void set_timeout_(ssize_t ms, int opt);
         void listen_(unsigned addr, unsigned port, int max_connection);
 
@@ -33,4 +32,4 @@ namespace tcp {
 
 }
 
-#endif //HW_3_SERVER_H
+#endif //TCP_SERVER_H

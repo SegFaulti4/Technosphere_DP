@@ -1,14 +1,15 @@
-#ifndef NET_NETEXCEPTION_H
-#define NET_NETEXCEPTION_H
+#ifndef HTTP_HTTPEXCEPTION_H
+#define HTTP_HTTPEXCEPTION_H
 
 #include <stdexcept>
+#include "NetException.h"
 
 namespace http {
 
-    class HttpException : public std::runtime_error {
-        using std::runtime_error::runtime_error;
+    class HttpException : public net::NetException {
+        using net::NetException::NetException;
     };
 
 }
 
-#endif //NET_NETEXCEPTION_H
+#endif //HTTP_HTTPEXCEPTION_H

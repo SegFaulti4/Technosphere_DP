@@ -1,5 +1,5 @@
-#ifndef HW_1_DESCRIPTOR_H
-#define HW_1_DESCRIPTOR_H
+#ifndef TCP_DESCRIPTOR_H
+#define TCP_DESCRIPTOR_H
 
 #include <string>
 #include "fcntl.h"
@@ -33,4 +33,4 @@ namespace tcp {
 
 }
 
-#endif //HW_1_DESCRIPTOR_H
+#endif //TCP_DESCRIPTOR_H

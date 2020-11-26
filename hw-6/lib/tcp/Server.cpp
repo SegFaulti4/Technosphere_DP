@@ -38,7 +38,6 @@ namespace tcp {
         }
 
         descriptor_ = std::move(fd);
-        addr_in_ = addr_in;
     }
 
     void Server::listen(const std::string & addr, unsigned port, int max_connection) {
@@ -95,7 +94,6 @@ namespace tcp {
 
     Server & Server::operator=(Server &&other) noexcept {
         descriptor_ = std::move(other.descriptor_);
-        addr_in_ = other.addr_in_;
         return *this;
     }
 
