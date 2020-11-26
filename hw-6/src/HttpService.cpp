@@ -96,7 +96,7 @@ namespace http {
         std::array<::epoll_event, event_queue_size> event_queue{};
         while (isRunning() || !connections_.empty()) {
             int events_count = client_epoll_.wait(event_queue.data(), event_queue.size(), 0);
-            std::cout << "client event: " << events_count << std::endl;
+            std::cerr << "client event: " << events_count << std::endl;
             sleep(1);
             for (int i = 0; i < events_count; i++) {
                 auto epoll_data = reinterpret_cast<net::Epoll_data *>(event_queue[i].data.ptr);
@@ -107,11 +107,11 @@ namespace http {
                     }
                     HttpConnection & http_con = *reinterpret_cast<HttpConnection *>(epoll_data->ptr);
                     if (event_queue[i].events & EPOLLRDHUP) {   // соединение закрыто клиентом, буфер чтения не парсится
-                        std::cout << "RDHUP" << std::endl;
+                        std::cerr << "RDHUP" << std::endl;
                         http_con.set_valid(false);
                     } else {
                         if (event_queue[i].events & EPOLLOUT) {
-                            std::cout << "OUT" << std::endl;
+                            std::cerr << "OUT" << std::endl;
                             http_con.write_until_eagain();
                             if (!http_con.write_ongoing()) {
                                 http_con.unsubscribe(net::WRITE);
@@ -121,7 +121,7 @@ namespace http {
                             }
                         }
                         if (event_queue[i].events & EPOLLIN) {
-                            std::cout << "IN" << std::endl;
+                            std::cerr << "IN" << std::endl;
                             http_con.read_until_eagain();
                             if (listener_) {
                                 if (http_con.request_available()) {
