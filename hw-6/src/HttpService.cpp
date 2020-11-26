@@ -42,11 +42,13 @@ namespace http {
                 threads.emplace_back(&http::HttpService::workerRun_, this);
             }
             watchdog_time_point_ = steady_clock::now();
+            setRunning(true);
             while (isRunning()) {
                 if (watchdog_time_() > watchdog_period) {
                     watchdog_();
                 }
-                int events_count = accept_epoll_.wait(event_queue.data(), event_queue.size(), -1);
+                //log::info("watchdog time " + std::to_string(watchdog_time_()));
+                int events_count = accept_epoll_.wait(event_queue.data(), event_queue.size(), 0);
                 for (int i = 0; i < events_count; i++) {
                     auto epoll_data = reinterpret_cast<net::Epoll_data *>(event_queue[i].data.ptr);
                     if (epoll_data->type == net::SERVER && event_queue[i].events & EPOLLIN) {
@@ -54,6 +56,7 @@ namespace http {
                         if (j == -1) {
                             throw HttpException("Maximum connection amount reached");
                         }
+                        used_mutexes[j] = true;
                         addConnection_(std::move(HttpConnection(net::BufferedConnection
                                 (server_.accept(), client_epoll_), i)));
                     } else {
@@ -72,7 +75,9 @@ namespace http {
     }
 
     void HttpService::addConnection_(HttpConnection && http_con) {
+        int fd = http_con.getDescriptor().get_fd();
         connections_.emplace(http_con.getDescriptor().get_fd(), std::move(http_con));
+        connections_.at(fd).reset_ptr();
     }
 
     void HttpService::setRunning(bool b) {
@@ -84,6 +89,7 @@ namespace http {
     }
 
     void HttpService::closeConnection_(int fd) {
+        log::info("Connection closed");
         auto closed_con = connections_.find(fd);
         if (closed_con != connections_.end()) {
             connections_.erase(closed_con);
@@ -96,50 +102,64 @@ namespace http {
         std::array<::epoll_event, event_queue_size> event_queue{};
         while (isRunning() || !connections_.empty()) {
             int events_count = client_epoll_.wait(event_queue.data(), event_queue.size(), 0);
-            std::cerr << "client event: " << events_count << std::endl;
+            log::info("client event: " + std::to_string(events_count));
             sleep(1);
             for (int i = 0; i < events_count; i++) {
                 auto epoll_data = reinterpret_cast<net::Epoll_data *>(event_queue[i].data.ptr);
+
+                log::info(std::to_string(epoll_data->meta) + " " + std::to_string((long long)epoll_data->ptr)
+                        + " " + std::to_string(epoll_data->type) + " " + std::to_string(epoll_data->fd));
+                log::info(std::to_string((long long)&connections_.at(epoll_data->fd)));
+
                 mutexes[epoll_data->meta].lock();
                 if (used_mutexes[epoll_data->meta]) {
                     if (epoll_data->type != net::CONNECTION) {
                         throw HttpException("Invalid event in client run");
                     }
-                    HttpConnection & http_con = *reinterpret_cast<HttpConnection *>(epoll_data->ptr);
+                    auto http_con = reinterpret_cast<HttpConnection *>(epoll_data->ptr);
+
+                    if (http_con->getDescriptor().is_valid()) {
+                        log::info("OK");
+                    } else {
+                        log::info("WARN");
+                    }
+
                     if (event_queue[i].events & EPOLLRDHUP) {   // соединение закрыто клиентом, буфер чтения не парсится
-                        std::cerr << "RDHUP" << std::endl;
-                        http_con.set_valid(false);
+                        log::info("RDHUP");
+                        http_con->set_valid(false);
                     } else {
                         if (event_queue[i].events & EPOLLOUT) {
-                            std::cerr << "OUT" << std::endl;
-                            http_con.write_until_eagain();
-                            if (!http_con.write_ongoing()) {
-                                http_con.unsubscribe(net::WRITE);
-                                http_con.refresh_time();
+                            log::info("OUT");
+                            http_con->write_until_eagain();
+                            if (!http_con->write_ongoing()) {
+                                http_con->unsubscribe(net::WRITE);
+                                http_con->refresh_time();
                             } else {
-                                http_con.resubscribe();
+                                http_con->resubscribe();
                             }
                         }
                         if (event_queue[i].events & EPOLLIN) {
-                            std::cerr << "IN" << std::endl;
-                            http_con.read_until_eagain();
+                            log::info("IN");
+                            http_con->read_until_eagain();
                             if (listener_) {
-                                if (http_con.request_available()) {
+                                if (http_con->request_available()) {
                                     bool keep_alive = false;
-                                    HttpRequest &request = http_con.get_request();
+                                    HttpRequest &request = http_con->get_request();
                                     if (request.find("Connection") != request.end()
                                         && request["Connection"] == "keep-alive") {
                                         keep_alive = true;
                                     }
-                                    listener_->onRequest(http_con);
+                                    log::info("keep-alive " + std::to_string(keep_alive));
+                                    listener_->onRequest(*http_con);
                                     if (!keep_alive) {
-                                        http_con.set_valid(false);
+                                        http_con->set_valid(false);
                                     }
                                 }
                             }
-                            if (http_con.is_valid()) {
-                                http_con.resubscribe();
+                            if (http_con->is_valid() || http_con->write_ongoing()) {
+                                http_con->resubscribe();
                             }
+                            log::info("is valid " + std::to_string(http_con->is_valid()));
                         }
                     }
                 }
@@ -169,18 +189,27 @@ namespace http {
     }
 
     void HttpService::watchdog_() {
+        std::queue<int> close_queue;
         for (auto & connection : connections_) {
             int mutex_idx = connection.second.get_mutex_idx();
             if (!used_mutexes[mutex_idx]) {
                 throw HttpException("Invalid mutex");
             }
             mutexes[mutex_idx].lock();
-            if (connection.second.downtime_duration() > max_downtime || !connection.second.is_valid()) {
-                closeConnection_(connection.second);
+            log::info("(watchdog) is valid: " + std::to_string(connection.second.is_valid()));
+            log::info("(watchdog) write ongoing: " + std::to_string(connection.second.write_ongoing()));
+            if (connection.second.downtime_duration() > max_downtime ||
+                    !(connection.second.is_valid() || connection.second.write_ongoing())) {
+                close_queue.push(connection.second.getDescriptor().get_fd());
                 used_mutexes[mutex_idx] = false;
             }
             mutexes[mutex_idx].unlock();
         }
+        while (!close_queue.empty()) {
+            closeConnection_(close_queue.front());
+            close_queue.pop();
+        }
+        watchdog_time_point_ = steady_clock::now();
     }
 
 }

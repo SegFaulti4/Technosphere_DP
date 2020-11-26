@@ -3,6 +3,7 @@
 
 #include <stdexcept>
 #include "NetException.h"
+#include "log.h"
 
 namespace http {
 

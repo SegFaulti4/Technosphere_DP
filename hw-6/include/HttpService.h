@@ -4,7 +4,9 @@
 #include "HttpConnection.h"
 #include "HttpException.h"
 #include "net.h"
+#include "log.h"
 #include <thread>
+#include <queue>
 
 namespace http {
 

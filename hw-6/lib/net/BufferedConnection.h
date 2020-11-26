@@ -25,7 +25,7 @@ namespace net {
         void subscribe(Event_subscribe event);
         void unsubscribe(Event_subscribe event);
         void read_into_buf();
-        void write_into_buf();
+        void write_from_buf();
         std::string &get_read_buf();
         std::string &get_write_buf();
         const tcp::Descriptor &get_descriptor() const;

@@ -47,7 +47,7 @@ namespace net {
         }
     }
 
-    void BufferedConnection::write_into_buf() {
+    void BufferedConnection::write_from_buf() {
         size_t res = connection_.write(write_buf_.data(), write_buf_.size());
         if (!res) {
             throw NetException("Nothing was written");

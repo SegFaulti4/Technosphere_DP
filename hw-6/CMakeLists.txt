@@ -12,6 +12,10 @@ set(NET_LIB_NAME net)
 set(NET_LIB_INCLUDE lib/net)
 set(NET_LIB_SRC lib/net/BufferedConnection.cpp lib/net/EPoll.cpp lib/net/Service.cpp)
 
+set(LOGGER_LIB_NAME logger)
+set(LOGGER_LIB_INCLUDE lib/logger)
+set(LOGGER_LIB_SRC lib/logger/BaseLogger.cpp lib/logger/Global.cpp lib/logger/Logger.cpp)
+
 set(PROJECT_SRC src/HttpService.cpp src/HttpConnection.cpp)
 set(PROJECT_INCLUDE include)
 
@@ -22,6 +26,12 @@ add_library(${NET_LIB_NAME} STATIC ${NET_LIB_SRC})
 target_include_directories(${NET_LIB_NAME} PUBLIC ${NET_LIB_INCLUDE})
 target_link_libraries(${NET_LIB_NAME} PUBLIC ${TCP_LIB_NAME})
 
+add_library(${LOGGER_LIB_NAME} STATIC ${LOGGER_LIB_SRC})
+target_include_directories(${LOGGER_LIB_NAME} PUBLIC ${LOGGER_LIB_INCLUDE})
+
 add_library(${PROJECT_NAME} STATIC ${PROJECT_SRC})
 target_include_directories(${PROJECT_NAME} PUBLIC ${PROJECT_INCLUDE})
-target_link_libraries(${PROJECT_NAME} PUBLIC ${NET_LIB_NAME})
+target_link_libraries(${PROJECT_NAME} PUBLIC ${NET_LIB_NAME} ${LOGGER_LIB_NAME})
+
+add_executable(test main.cpp)
+target_link_libraries(test PUBLIC ${PROJECT_NAME})

@@ -2,6 +2,7 @@
 #define HTTP_HTTPCONNECTION_H
 
 #include "net.h"
+#include "log.h"
 #include "HttpException.h"
 #include <map>
 #include <vector>
@@ -36,7 +37,6 @@ namespace http {
 
     const int max_request_line_length = 4096;
     const int max_message_headers_length = 4096;
-    const int max_message_body_length = 4096;
 
     class HttpConnection {
     private:
@@ -56,20 +56,23 @@ namespace http {
 
         void read_until_eagain();
         void write_until_eagain();
+        int get_mutex_idx() const;
         bool request_available() const;
-        HttpRequest & get_request();
-        void clear_request();
         int downtime_duration();
         void refresh_time();
         void resubscribe();
-        void subscribe(net::Event_subscribe event);
-        void unsubscribe(net::Event_subscribe event);
         bool write_ongoing();
         bool is_valid() const;
         void set_valid(bool b);
         const tcp::Descriptor & getDescriptor() const;
-        std::string &get_read_buf();
-        int get_mutex_idx() const;
+        void reset_ptr();
+
+        HttpRequest & get_request();
+        void clear_request();
+        void write_response(const std::string & responce);
+        void subscribe(net::Event_subscribe event);
+        void unsubscribe(net::Event_subscribe event);
+
         HttpConnection & operator=(HttpConnection && other) noexcept;
 
         friend class HttpService;
