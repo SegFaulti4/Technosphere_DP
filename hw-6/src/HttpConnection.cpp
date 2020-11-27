@@ -8,12 +8,6 @@ namespace http {
         mutex_idx_ = mutex_idx;
         connection_.set_meta(mutex_idx);
         connection_.set_ptr(this);
-        connection_.ctl(EPOLL_CTL_MOD, subscription_);
-        if (getDescriptor().is_valid()) {
-            log::info("OK\n");
-        } else {
-            log::info("WARN\n");
-        }
     }
 
     HttpConnection::HttpConnection(HttpConnection && other)  noexcept : connection_(std::move(other.connection_)) {
@@ -223,7 +217,10 @@ namespace http {
 
     void HttpConnection::reset_ptr() {
         connection_.set_ptr(this);
-        connection_.ctl(EPOLL_CTL_MOD, subscription_);
+    }
+
+    void HttpConnection::start() {
+        connection_.ctl(EPOLL_CTL_ADD, subscription_);
     }
 
 

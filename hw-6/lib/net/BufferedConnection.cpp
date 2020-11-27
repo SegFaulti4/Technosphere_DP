@@ -9,7 +9,6 @@ namespace net {
         epoll_data_.fd = connection_.get_descriptor().get_fd();
         epoll_data_.ptr = this;
         epoll_data_.meta = 0;
-        epoll_.ctl(EPOLL_CTL_ADD, &epoll_data_, subscription_);
     }
 
     BufferedConnection::BufferedConnection(BufferedConnection && other) noexcept  : epoll_(other.epoll_),
@@ -18,6 +17,10 @@ namespace net {
         write_buf_ = std::move(other.write_buf_);
         epoll_data_ = other.epoll_data_;
         subscription_ = other.subscription_;
+    }
+
+    void BufferedConnection::start() {
+        epoll_.ctl(EPOLL_CTL_ADD, &epoll_data_, subscription_);
     }
 
     void BufferedConnection::subscribe(Event_subscribe event) {

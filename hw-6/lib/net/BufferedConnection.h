@@ -22,6 +22,7 @@ namespace net {
         ~BufferedConnection() = default;
         BufferedConnection(BufferedConnection && other) noexcept ;
 
+        void start();
         void subscribe(Event_subscribe event);
         void unsubscribe(Event_subscribe event);
         void read_into_buf();

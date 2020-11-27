@@ -22,7 +22,7 @@ http::IHttpServiceListener::~IHttpServiceListener() = default;
 int main() {
     log::init_with_stderr_logger(log::LL_INFO);
     ReadService listener;
-    http::HttpService service(1, &listener);
+    http::HttpService service(2, &listener);
     service.open(INADDR_ANY, 8080);
     service.run();
     return 0;

@@ -18,8 +18,8 @@ namespace http {
 
     const size_t event_queue_size = 1024;
     const int max_downtime = 5000;
-    const int max_connection_amount = 10000;
-    const int watchdog_period = 3000;
+    const int max_connection_amount = 10;
+    const int watchdog_period = 10;
 
     using HttpConnectionMap = std::map<int, HttpConnection>;
     using MutexArray = std::array<std::mutex, max_connection_amount>;

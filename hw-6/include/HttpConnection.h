@@ -66,6 +66,7 @@ namespace http {
         void set_valid(bool b);
         const tcp::Descriptor & getDescriptor() const;
         void reset_ptr();
+        void start();
 
         HttpRequest & get_request();
         void clear_request();

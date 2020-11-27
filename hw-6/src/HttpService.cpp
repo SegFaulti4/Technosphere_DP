@@ -78,6 +78,7 @@ namespace http {
         int fd = http_con.getDescriptor().get_fd();
         connections_.emplace(http_con.getDescriptor().get_fd(), std::move(http_con));
         connections_.at(fd).reset_ptr();
+        connections_.at(fd).start();
     }
 
     void HttpService::setRunning(bool b) {
@@ -90,6 +91,9 @@ namespace http {
 
     void HttpService::closeConnection_(int fd) {
         log::info("Connection closed");
+        /*for (int i = 0; i < max_connection_amount; i++) {
+            std::cerr << i << ": " << used_mutexes[i] << std::endl;
+        }*/
         auto closed_con = connections_.find(fd);
         if (closed_con != connections_.end()) {
             connections_.erase(closed_con);
@@ -101,17 +105,14 @@ namespace http {
     void HttpService::workerRun_() {
         std::array<::epoll_event, event_queue_size> event_queue{};
         while (isRunning() || !connections_.empty()) {
-            int events_count = client_epoll_.wait(event_queue.data(), event_queue.size(), 0);
-            log::info("client event: " + std::to_string(events_count));
-            sleep(1);
+            int events_count = client_epoll_.wait(event_queue.data(), event_queue.size(), -1);
+            //log::info("client event: " + std::to_string(events_count));
             for (int i = 0; i < events_count; i++) {
                 auto epoll_data = reinterpret_cast<net::Epoll_data *>(event_queue[i].data.ptr);
-
+                mutexes[epoll_data->meta].lock();
                 log::info(std::to_string(epoll_data->meta) + " " + std::to_string((long long)epoll_data->ptr)
                         + " " + std::to_string(epoll_data->type) + " " + std::to_string(epoll_data->fd));
                 log::info(std::to_string((long long)&connections_.at(epoll_data->fd)));
-
-                mutexes[epoll_data->meta].lock();
                 if (used_mutexes[epoll_data->meta]) {
                     if (epoll_data->type != net::CONNECTION) {
                         throw HttpException("Invalid event in client run");
@@ -173,12 +174,12 @@ namespace http {
         int old_i = i;
         for (; i < max_connection_amount; i++) {
             if (!used_mutexes[i]) {
-                return i++;
+                return i;
             }
         }
         for (i = 0; i < old_i; i++) {
             if (!used_mutexes[i]) {
-                return i++;
+                return i;
             }
         }
         return -1;
@@ -189,25 +190,25 @@ namespace http {
     }
 
     void HttpService::watchdog_() {
-        std::queue<int> close_queue;
-        for (auto & connection : connections_) {
-            int mutex_idx = connection.second.get_mutex_idx();
+        //log::info("watchdog");
+        for (auto it = connections_.begin(); it != connections_.end();) {
+            int mutex_idx = it->second.get_mutex_idx();
             if (!used_mutexes[mutex_idx]) {
                 throw HttpException("Invalid mutex");
             }
             mutexes[mutex_idx].lock();
-            log::info("(watchdog) is valid: " + std::to_string(connection.second.is_valid()));
-            log::info("(watchdog) write ongoing: " + std::to_string(connection.second.write_ongoing()));
-            if (connection.second.downtime_duration() > max_downtime ||
-                    !(connection.second.is_valid() || connection.second.write_ongoing())) {
-                close_queue.push(connection.second.getDescriptor().get_fd());
+            log::info("(watchdog) is valid: " + std::to_string(it->second.is_valid()));
+            log::info("(watchdog) write ongoing: " + std::to_string(it->second.write_ongoing()));
+            if (it->second.downtime_duration() > max_downtime ||
+                    !(it->second.is_valid() || it->second.write_ongoing())) {
+                int fd = it->second.getDescriptor().get_fd();
+                it++;
+                closeConnection_(fd);
                 used_mutexes[mutex_idx] = false;
+            } else {
+                it++;
             }
             mutexes[mutex_idx].unlock();
-        }
-        while (!close_queue.empty()) {
-            closeConnection_(close_queue.front());
-            close_queue.pop();
         }
         watchdog_time_point_ = steady_clock::now();
     }
