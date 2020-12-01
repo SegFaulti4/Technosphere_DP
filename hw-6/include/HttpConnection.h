@@ -15,68 +15,47 @@ namespace http {
     using HttpRequest = std::map<std::string, std::string>;
     using ms = std::chrono::milliseconds;
 
-    enum HttpParserMode {
-        REQUEST_LINE = 0,
-        MESSAGE_HEADERS = 1,
-        MESSAGE_BODY = 2
-    };
-
-    const std::string AllowedRequestMethods[] = {
-            "GET"
-    };
-
-    const std::string AllowedType_Versions[] = {
-            "HTTP/1.1",
-            "HTTP/1.0"
-    };
-
-    const std::string AllowedMessageHeaders[] = {
-            "Connection: ",
-            "Content-Length: "
-    };
-
-    const int max_request_line_length = 4096;
-    const int max_message_headers_length = 4096;
-
     class HttpConnection {
     private:
+        enum HttpParserMode {
+            REQUEST_LINE = 0,
+            MESSAGE_HEADERS = 1,
+            MESSAGE_BODY = 2
+        };
+
         net::BufferedConnection connection_;
         HttpRequest request_;
         bool request_available_ = false;
-        bool valid_ = true;
         HttpParserMode mode_ = REQUEST_LINE;
         time_point last_used_ = steady_clock::now();
-        int subscription_ = EPOLLRDHUP | EPOLLET | EPOLLONESHOT | EPOLLIN;
-        int mutex_idx_;
+        int subscription_ = EPOLLET | EPOLLONESHOT | EPOLLIN | EPOLLRDHUP;
+        std::mutex mutex_;
 
     public:
-        explicit HttpConnection(net::BufferedConnection && buf_con, int mutex_idx);
+        explicit HttpConnection(net::BufferedConnection && buf_con);
         ~HttpConnection() = default;
         HttpConnection(HttpConnection && other) noexcept;
 
-        void read_until_eagain();
-        void write_until_eagain();
-        int get_mutex_idx() const;
-        bool request_available() const;
-        int downtime_duration();
-        void refresh_time();
+        void openEpoll();
+        void close();
+        void readUntilEagain();
+        void writeUntilEagain();
+        void subscribe(net::EventSubscribe event);
+        void unsubscribe(net::EventSubscribe event);
         void resubscribe();
-        bool write_ongoing();
-        bool is_valid() const;
-        void set_valid(bool b);
+        void refreshTime();
+        int downtimeDuration();
+        bool isWriting();
+        bool isValid();
+        bool requestAvailable() const;
         const tcp::Descriptor & getDescriptor() const;
-        void reset_ptr();
-        void start();
+        std::mutex & getMutex();
 
-        HttpRequest & get_request();
-        void clear_request();
-        void write_response(const std::string & responce);
-        void subscribe(net::Event_subscribe event);
-        void unsubscribe(net::Event_subscribe event);
+        HttpRequest & getRequest();
+        void clearRequest();
+        void writeResponse(const std::string & response);
 
         HttpConnection & operator=(HttpConnection && other) noexcept;
-
-        friend class HttpService;
     };
 
 }

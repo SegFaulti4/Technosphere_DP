@@ -9,30 +9,29 @@ namespace net {
 
     class BufferedConnection {
     private:
-        static const size_t max_read_length_ = 4096;
         int subscription_ = EPOLLRDHUP;
         std::string read_buf_;
         std::string write_buf_;
         tcp::Connection connection_;
         EPoll &epoll_;
-        Epoll_data epoll_data_;
+        void * epoll_data_;
 
     public:
         BufferedConnection(tcp::Connection con, EPoll &epoll);
         ~BufferedConnection() = default;
         BufferedConnection(BufferedConnection && other) noexcept ;
 
-        void start();
-        void subscribe(Event_subscribe event);
-        void unsubscribe(Event_subscribe event);
-        void read_into_buf();
-        void write_from_buf();
-        std::string &get_read_buf();
-        std::string &get_write_buf();
-        const tcp::Descriptor &get_descriptor() const;
+        void openEpoll();
+        void close();
+        void subscribe(EventSubscribe event);
+        void unsubscribe(EventSubscribe event);
+        void readIntoBuf();
+        void writeFromBuf();
+        std::string &getReadBuf();
+        std::string &getWriteBuf();
+        [[nodiscard]] const tcp::Descriptor &getDescriptor() const;
         void ctl(int op, int event);
-        void set_meta(int meta);
-        void set_ptr(void * ptr);
+        void setEpollData(void * ptr);
         BufferedConnection & operator=(BufferedConnection && other) noexcept;
     };
 

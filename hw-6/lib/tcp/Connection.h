@@ -16,7 +16,7 @@ namespace tcp {
     private:
         Descriptor descriptor_;
         explicit Connection(int socket);
-        void set_timeout_(ssize_t ms, int opt);
+        void setTimeout_(ssize_t ms, int opt);
         void connect_(unsigned addr, unsigned port);
 
     public:
@@ -34,8 +34,8 @@ namespace tcp {
         size_t write(const void *buf, size_t count);
         void readExact(void *buf, size_t count);
         void writeExact(const void *buf, size_t count);
-        void set_timeout(ssize_t ms);
-        [[nodiscard]] const Descriptor & get_descriptor() const;
+        void setTimeout(ssize_t ms);
+        [[nodiscard]] const Descriptor & getDescriptor() const;
 
         friend class Server;
         /*

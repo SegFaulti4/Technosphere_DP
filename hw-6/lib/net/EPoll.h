@@ -9,24 +9,12 @@
 
 namespace net {
 
-    enum Event_subscribe {
+    enum EventSubscribe {
         NOTHING = 0,
         READ = EPOLLIN,
         WRITE = EPOLLOUT,
         READWRITE = EPOLLIN | EPOLLOUT
     };
-
-    enum Net_ptr_type {
-        SERVER = 0,
-        CONNECTION = 1
-    };
-
-    typedef struct Epoll_data {
-        Net_ptr_type type;
-        void * ptr;
-        int meta;
-        int fd;
-    } Epoll_data;
 
     class EPoll {
     private:
@@ -35,11 +23,11 @@ namespace net {
     public:
         EPoll();
 
-        void add(Epoll_data * data, Event_subscribe event);
-        void del(Epoll_data * data);
-        void mod(Epoll_data * data, Event_subscribe event);
+        void add(int fd, void * data, EventSubscribe event);
+        void del(int fd, void * data);
+        void mod(int fd, void * data, EventSubscribe event);
         int wait(struct epoll_event *events, int max_events, int timeout);
-        void ctl(int op, Epoll_data * data, int events);
+        void ctl(int op, int fd, void * data, int events);
     };
 
 }

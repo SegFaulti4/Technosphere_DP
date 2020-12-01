@@ -10,7 +10,7 @@ namespace log {
     public:
         StdoutLogger() : BaseLogger(std::cout) {}
 
-        explicit StdoutLogger(Logger_level lvl) : BaseLogger(std::cout, lvl) {}
+        explicit StdoutLogger(LoggerLevel lvl) : BaseLogger(std::cout, lvl) {}
     };
 
 }

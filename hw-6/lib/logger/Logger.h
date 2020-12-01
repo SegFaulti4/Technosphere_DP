@@ -7,9 +7,9 @@ namespace log {
 
     class Logger {
     public:
-        static Logger & get_instance();
-        BaseLogger & get_global_logger();
-        void set_global_logger(std::unique_ptr<BaseLogger> bl);
+        static Logger & getInstance();
+        BaseLogger & getGlobalLogger();
+        void setGlobalLogger(std::unique_ptr<BaseLogger> bl);
 
         Logger(Logger const &) = delete;
         Logger(Logger &&) = delete;

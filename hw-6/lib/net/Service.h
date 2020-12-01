@@ -22,8 +22,6 @@ namespace net {
         virtual void onError(BufferedConnection & buf_con, const std::string & what, Service & service) = 0;
     };
 
-    const size_t event_queue_size_ = 1024;
-
     using BufferedConnectionMap = std::map<int, BufferedConnection>;
 
     class Service {
@@ -32,8 +30,8 @@ namespace net {
         BufferedConnectionMap connections_;
         tcp::Server server_;
         EPoll epoll_;
-        Epoll_data epoll_data_;
         bool running_ = false;
+        void * epoll_data_;
 
         void closeConnection_(int fd);
 

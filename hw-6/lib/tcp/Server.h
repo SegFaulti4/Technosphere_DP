@@ -9,7 +9,7 @@ namespace tcp {
     class Server {
     private:
         Descriptor descriptor_;
-        void set_timeout_(ssize_t ms, int opt);
+        void setTimeout_(ssize_t ms, int opt);
         void listen_(unsigned addr, unsigned port, int max_connection);
 
     public:
@@ -24,10 +24,10 @@ namespace tcp {
         void listen(unsigned addr, unsigned port, int max_connection = SOMAXCONN);
         void close();
         Connection accept();
-        void set_timeout(ssize_t ms);
-        void set_max_connection(int new_max);
+        void setTimeout(ssize_t ms);
+        void setMaxConnection(int new_max);
         Server & operator=(Server && other) noexcept;
-        const Descriptor & get_descriptor();
+        const Descriptor & getDescriptor();
     };
 
 }

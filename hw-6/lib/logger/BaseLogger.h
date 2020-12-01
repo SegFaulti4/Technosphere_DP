@@ -8,7 +8,7 @@
 
 namespace log {
 
-    enum Logger_level {
+    enum LoggerLevel {
         LL_ERROR = 0,
         LL_WARN = 1,
         LL_INFO = 2,
@@ -18,25 +18,25 @@ namespace log {
     class BaseLogger {
     private:
         std::ostream& stream_;
-        Logger_level level_;
+        LoggerLevel level_;
 
     protected:
-        void log(const std::string & what, Logger_level lvl);
+        void log(const std::string & what, LoggerLevel lvl);
         std::vector<std::string> LOGGER_LEVEL_OUT_TABLE = {
                 "error: ",
                 "warn: ",
                 "info: ",
                 "debug: "
         };
-        explicit BaseLogger(std::ostream & stream, Logger_level level = LL_INFO) : stream_(stream), level_(level) {}
+        explicit BaseLogger(std::ostream & stream, LoggerLevel level = LL_INFO) : stream_(stream), level_(level) {}
 
     public:
         void debug(const std::string & what);
         void info(const std::string & what);
         void warn(const std::string & what);
         void error(const std::string & what);
-        void set_level(Logger_level lvl);
-        int level() const;
+        void set_level(LoggerLevel lvl);
+        [[nodiscard]] int level() const;
         void flush();
     };
 

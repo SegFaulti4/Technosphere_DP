@@ -15,7 +15,7 @@ namespace tcp {
     }
 
     void Descriptor::close() {
-        if (is_valid()) {
+        if (isValid()) {
             if (::close(fd_) == -1) {
                 fd_ = -1;
                 throw TcpException("Close error");
@@ -24,17 +24,17 @@ namespace tcp {
         }
     }
 
-    void Descriptor::set_fd(int fd) {
+    void Descriptor::setFd(int fd) {
         close();
         fd_ = fd;
     }
 
-    int Descriptor::get_fd() const {
+    int Descriptor::getFd() const {
         return fd_;
     }
 
     size_t Descriptor::read(void *data, size_t count) const {
-        if (!is_valid()) {
+        if (!isValid()) {
             throw TcpException("Read from invalid descriptor");
         }
         ssize_t res = ::read(fd_, data, count);
@@ -49,7 +49,7 @@ namespace tcp {
     }
 
     size_t Descriptor::write(const void *data, size_t count) const {
-        if (!is_valid()) {
+        if (!isValid()) {
             throw TcpException("Write to invalid descriptor");
         }
         ssize_t res = ::write(fd_, data, count);
@@ -92,7 +92,7 @@ namespace tcp {
         return *this;
     }
 
-    bool Descriptor::is_valid() const {
+    bool Descriptor::isValid() const {
         return fd_ != -1;
     }
 

@@ -7,6 +7,8 @@
 #include "log.h"
 #include <thread>
 #include <queue>
+#include <atomic>
+#include <list>
 
 namespace http {
 
@@ -16,35 +18,32 @@ namespace http {
         virtual void onRequest(HttpConnection & http_connection) = 0;
     };
 
-    const size_t event_queue_size = 1024;
-    const int max_downtime = 5000;
-    const int max_connection_amount = 10;
-    const int watchdog_period = 10;
-
-    using HttpConnectionMap = std::map<int, HttpConnection>;
-    using MutexArray = std::array<std::mutex, max_connection_amount>;
+    using HttpConnectionList = std::list<HttpConnection>;
+    using HttpConnectionQueue = std::queue<HttpConnection *>;
+    using steady_clock = std::chrono::steady_clock;
+    using time_point = std::chrono::time_point<steady_clock>;
+    using HttpRequest = std::map<std::string, std::string>;
+    using ms = std::chrono::milliseconds;
 
     class HttpService {
     private:
         IHttpServiceListener * listener_;
-        HttpConnectionMap connections_;
-        MutexArray mutexes;
-        std::array<bool, max_connection_amount> used_mutexes = { false };
+        HttpConnectionList connections_;
+        HttpConnectionQueue available_connections_;
         tcp::Server server_;
-        net::Epoll_data epoll_data_;
-        net::EPoll accept_epoll_;
         net::EPoll client_epoll_;
+        std::mutex queue_mutex_;
         unsigned worker_amount_;
-        time_point watchdog_time_point_;
         bool running_ = false;
+        std::atomic<int> opened_connections_amount_ = 0;
+        time_point last_watchdog_run_ = steady_clock::now();
 
         void workerRun_();
-        void closeConnection_(int fd);
-        int findNewMutex_();
         void closeConnection_(HttpConnection & http_con);
         void addConnection_(HttpConnection && http_con);
-        int watchdog_time_();
         void watchdog_();
+        void setRunning_(bool b);
+        int watchdogDowntimeDuration_();
 
     public:
         explicit HttpService(unsigned worker_amount = 1, IHttpServiceListener * listener = nullptr);
@@ -55,7 +54,6 @@ namespace http {
         void open(const std::string & addr, unsigned port, int max_connection = SOMAXCONN);
         void close();
         void run();
-        void setRunning(bool b);
         bool isRunning() const;
     };
 

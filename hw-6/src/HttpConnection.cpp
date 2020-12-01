@@ -3,11 +3,26 @@
 
 namespace http {
 
-    HttpConnection::HttpConnection(net::BufferedConnection && buf_con, int mutex_idx) :
+    const std::string AllowedRequestMethods[] = {
+            "GET"
+    };
+
+    const std::string AllowedTypeVersions[] = {
+            "HTTP/1.1",
+            "HTTP/1.0"
+    };
+
+    const std::string AllowedMessageHeaders[] = {
+            "Connection: ",
+            "Content-Length: "
+    };
+
+    constexpr int max_request_line_length = 4096;
+    constexpr int max_message_headers_length = 4096;
+
+    HttpConnection::HttpConnection(net::BufferedConnection && buf_con) :
             connection_(std::move(buf_con)) {
-        mutex_idx_ = mutex_idx;
-        connection_.set_meta(mutex_idx);
-        connection_.set_ptr(this);
+        connection_.setEpollData(this);
     }
 
     HttpConnection::HttpConnection(HttpConnection && other)  noexcept : connection_(std::move(other.connection_)) {
@@ -15,35 +30,36 @@ namespace http {
         request_available_ = other.request_available_;
         last_used_ = other.last_used_;
         subscription_ = other.subscription_;
-        mutex_idx_ = other.mutex_idx_;
+        connection_.setEpollData(this);
     }
 
     HttpConnection & HttpConnection::operator=(HttpConnection && other)  noexcept {
-        if (connection_.get_descriptor().get_fd() != other.connection_.get_descriptor().get_fd()) {
+        if (connection_.getDescriptor().getFd() != other.connection_.getDescriptor().getFd()) {
             connection_ = std::move(other.connection_);
             request_ = std::move(other.request_);
             request_available_ = other.request_available_;
             subscription_ = other.subscription_;
             last_used_ = other.last_used_;
-            mutex_idx_ = other.mutex_idx_;
+            connection_.setEpollData(this);
         }
         return *this;
     }
 
-    void HttpConnection::read_until_eagain() {
-        if (request_available_) {
+    void HttpConnection::readUntilEagain() {
+        if (request_available_ || isWriting()) {
             throw HttpException("Only one request is allowed at a time");
         }
         while (true) {
             try {
-                connection_.read_into_buf();
+                connection_.readIntoBuf();
             } catch (tcp::TcpBlockException &) {
                 break;
             } catch (net::NetException &) {
-            } catch (std::exception & exc) {
+                break;
+            } catch (std::exception &exc) {
                 throw exc;
             }
-            std::string & str = connection_.get_read_buf();
+            std::string &str = connection_.getReadBuf();
             log::info("mode: " + std::to_string(mode_));
             switch (mode_) {
 
@@ -74,7 +90,7 @@ namespace http {
                         request_["URI"] = str.substr(pos + 1, tmp_pos - pos);
                         pos = tmp_pos + 1;
                         tmp.clear();
-                        for (const std::string &type_version : AllowedType_Versions) {
+                        for (const std::string &type_version : AllowedTypeVersions) {
                             if (str.find(type_version, pos) == pos) {
                                 tmp = type_version;
                                 break;
@@ -86,7 +102,7 @@ namespace http {
                         }
                         log::info("type " + str.substr(pos, tmp_pos - pos));
                         log::info("version " +
-                                str.substr(tmp_pos + 1, end_of_req_line - tmp_pos - 1));
+                                  str.substr(tmp_pos + 1, end_of_req_line - tmp_pos - 1));
                         request_["type"] = str.substr(pos, tmp_pos - pos);
                         request_["version"] = str.substr(tmp_pos + 1, end_of_req_line - tmp_pos - 1);
                         str.erase(0, end_of_req_line + 2);
@@ -161,94 +177,93 @@ namespace http {
 
             }
         }
-        refresh_time();
     }
 
-    void HttpConnection::write_until_eagain() {
-        while (write_ongoing()) {
+    void HttpConnection::writeUntilEagain() {
+        while (isWriting()) {
             try {
-                connection_.write_from_buf();
+                connection_.writeFromBuf();
             } catch (tcp::TcpBlockException &) {
                 break;
             } catch (net::NetException &) {
+                break;
             } catch (std::exception & exc) {
                 throw exc;
             }
         }
-        refresh_time();
     }
 
-    int HttpConnection::get_mutex_idx() const {
-        return mutex_idx_;
-    }
-
-    bool HttpConnection::request_available() const {
+    bool HttpConnection::requestAvailable() const {
         return request_available_;
     }
 
-    int HttpConnection::downtime_duration() {
+    int HttpConnection::downtimeDuration() {
         return std::chrono::duration_cast<ms>(steady_clock::now() - last_used_).count();
     }
 
-    void HttpConnection::refresh_time() {
+    void HttpConnection::refreshTime() {
         last_used_ = steady_clock::now();
     }
 
     void HttpConnection::resubscribe() {
         connection_.ctl(EPOLL_CTL_MOD, subscription_);
-        refresh_time();
+        refreshTime();
     }
 
-    bool HttpConnection::write_ongoing() {
-        return !connection_.get_write_buf().empty();
+    bool HttpConnection::isWriting() {
+        return !connection_.getWriteBuf().empty();
     }
 
-    bool HttpConnection::is_valid() const {
-        return valid_;
-    }
-
-    void HttpConnection::set_valid(bool b) {
-        valid_ = b;
+    bool HttpConnection::isValid() {
+        return connection_.getDescriptor().isValid();
     }
 
     const tcp::Descriptor & HttpConnection::getDescriptor() const {
-        return connection_.get_descriptor();
+        return connection_.getDescriptor();
     }
 
-    void HttpConnection::reset_ptr() {
-        connection_.set_ptr(this);
+    void HttpConnection::close() {
+        connection_.close();
+        subscription_ = 0;
+        request_.clear();
+        mode_ = REQUEST_LINE;
+        request_available_ = false;
     }
 
-    void HttpConnection::start() {
+    void HttpConnection::openEpoll() {
+        connection_.setEpollData(this);
         connection_.ctl(EPOLL_CTL_ADD, subscription_);
     }
 
+    std::mutex & HttpConnection::getMutex() {
+        return mutex_;
+    }
 
-    HttpRequest & HttpConnection::get_request() {
+    HttpRequest & HttpConnection::getRequest() {
         return request_;
     }
 
-    void HttpConnection::clear_request() {
+    void HttpConnection::clearRequest() {
         request_.clear();
         request_available_ = false;
     }
 
-    void HttpConnection::subscribe(net::Event_subscribe event) {
+    void HttpConnection::subscribe(net::EventSubscribe event) {
         if (subscription_ ^ event) {
             subscription_ |= event;
             connection_.ctl(EPOLL_CTL_MOD, subscription_);
         }
     }
 
-    void HttpConnection::unsubscribe(net::Event_subscribe event) {
+    void HttpConnection::unsubscribe(net::EventSubscribe event) {
         if (event & subscription_) {
             subscription_ ^= event;
             connection_.ctl(EPOLL_CTL_MOD, subscription_);
         }
     }
 
-    void HttpConnection::write_response(const std::string &responce) {
-        connection_.get_write_buf().append(responce);
+    void HttpConnection::writeResponse(const std::string &response) {
+        connection_.getWriteBuf().append(response);
         subscribe(net::WRITE);
     }
 

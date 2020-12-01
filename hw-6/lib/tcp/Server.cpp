@@ -19,21 +19,21 @@ namespace tcp {
 
     void Server::listen_(unsigned addr, unsigned port, int max_connection) {
         Descriptor fd(::socket(AF_INET, SOCK_STREAM, 0));
-        if (!fd.is_valid()) {
+        if (!fd.isValid()) {
             throw TcpException("Socket init error");
         }
         int opt = 1;
-        if (::setsockopt(fd.get_fd(), SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1) {
+        if (::setsockopt(fd.getFd(), SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1) {
             throw TcpException("Set socket options error");
         }
         sockaddr_in addr_in{};
         addr_in.sin_family = AF_INET;
         addr_in.sin_port = ::htons(port);
         addr_in.sin_addr = { addr };
-        if (::bind(fd.get_fd(), reinterpret_cast<sockaddr*>(&addr_in), sizeof(addr_in)) == -1) {
+        if (::bind(fd.getFd(), reinterpret_cast<sockaddr*>(&addr_in), sizeof(addr_in)) == -1) {
             throw TcpException("Bind error");
         }
-        if (::listen(fd.get_fd(), max_connection) == -1) {
+        if (::listen(fd.getFd(), max_connection) == -1) {
             throw TcpException("Listen error");
         }
 
@@ -56,7 +56,7 @@ namespace tcp {
         sockaddr_in client_addr = {};
         socklen_t addr_size = sizeof(client_addr);
 
-        int acc_socket = ::accept4(descriptor_.get_fd(),reinterpret_cast<sockaddr*>(&client_addr),
+        int acc_socket = ::accept4(descriptor_.getFd(),reinterpret_cast<sockaddr*>(&client_addr),
                                   &addr_size, SOCK_NONBLOCK);
         if (acc_socket == -1) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -71,25 +71,25 @@ namespace tcp {
         descriptor_.close();
     }
 
-    void Server::set_max_connection(int new_max) {
-        if (descriptor_.is_valid()) {
-            if (::listen(descriptor_.get_fd(), new_max) == -1) {
+    void Server::setMaxConnection(int new_max) {
+        if (descriptor_.isValid()) {
+            if (::listen(descriptor_.getFd(), new_max) == -1) {
                 throw TcpException("Listen error");
             }
         }
     }
 
-    void Server::set_timeout_(ssize_t ms, int opt) {
+    void Server::setTimeout_(ssize_t ms, int opt) {
         timeval timeout{ .tv_sec = ms / 1000, .tv_usec = ms % 1000};
-        if (setsockopt(descriptor_.get_fd(), SOL_SOCKET, opt,
+        if (setsockopt(descriptor_.getFd(), SOL_SOCKET, opt,
                        &timeout, sizeof(timeout)) == -1) {
             throw TcpException("Socket option set error");
         }
     }
 
-    void Server::set_timeout(ssize_t ms) {
-        set_timeout_(ms, SO_SNDTIMEO);
-        set_timeout_(ms, SO_RCVTIMEO);
+    void Server::setTimeout(ssize_t ms) {
+        setTimeout_(ms, SO_SNDTIMEO);
+        setTimeout_(ms, SO_RCVTIMEO);
     }
 
     Server & Server::operator=(Server &&other) noexcept {
@@ -97,7 +97,7 @@ namespace tcp {
         return *this;
     }
 
-    const Descriptor & Server::get_descriptor() {
+    const Descriptor & Server::getDescriptor() {
         return descriptor_;
     }
 

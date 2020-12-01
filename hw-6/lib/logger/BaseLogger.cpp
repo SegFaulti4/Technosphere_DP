@@ -18,7 +18,7 @@ namespace log {
         log(what, LL_ERROR);
     }
 
-    void BaseLogger::set_level(Logger_level lvl) {
+    void BaseLogger::set_level(LoggerLevel lvl) {
         level_ = lvl;
     }
 
@@ -26,7 +26,7 @@ namespace log {
         return level_;
     }
 
-    void BaseLogger::log(const std::string &what, Logger_level lvl) {
+    void BaseLogger::log(const std::string &what, LoggerLevel lvl) {
         if (level_ >= lvl) {
             stream_ << LOGGER_LEVEL_OUT_TABLE[lvl] << what << "\n";
         }

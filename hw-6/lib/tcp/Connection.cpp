@@ -17,22 +17,22 @@ namespace tcp {
     }
 
     Connection::Connection(int socket) {
-        descriptor_.set_fd(socket);
+        descriptor_.setFd(socket);
     }
 
     void Connection::connect_(unsigned addr, unsigned port) {
         if (port > USHRT_MAX) {
             throw std::runtime_error("Wrong port number");
         }
-        descriptor_.set_fd(socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0));
-        if (!descriptor_.is_valid()) {
+        descriptor_.setFd(socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0));
+        if (!descriptor_.isValid()) {
             throw TcpException("Socket init error");
         }
         sockaddr_in addr_in{};
         addr_in.sin_family = AF_INET;
         addr_in.sin_port = ::htons(port);
         addr_in.sin_addr = { addr };
-        if (::connect(descriptor_.get_fd(), reinterpret_cast <sockaddr*>(&addr_in), sizeof(addr_in))) {
+        if (::connect(descriptor_.getFd(), reinterpret_cast <sockaddr*>(&addr_in), sizeof(addr_in))) {
             throw TcpException("Connect error");
         }
     }
@@ -69,17 +69,17 @@ namespace tcp {
         descriptor_.writeExact(buf, count);
     }
 
-    void Connection::set_timeout_(ssize_t ms, int opt) {
+    void Connection::setTimeout_(ssize_t ms, int opt) {
         timeval timeout{ .tv_sec = ms / 1000, .tv_usec = ms % 1000};
-        if (setsockopt(descriptor_.get_fd(), SOL_SOCKET, opt,
+        if (setsockopt(descriptor_.getFd(), SOL_SOCKET, opt,
                        &timeout, sizeof(timeout)) == -1) {
             throw TcpException("Socket option set error");
         }
     }
 
-    void Connection::set_timeout(ssize_t ms) {
-        set_timeout_(ms, SO_SNDTIMEO);
-        set_timeout_(ms, SO_RCVTIMEO);
+    void Connection::setTimeout(ssize_t ms) {
+        setTimeout_(ms, SO_SNDTIMEO);
+        setTimeout_(ms, SO_RCVTIMEO);
     }
 
     Connection & Connection::operator=(Connection && other) noexcept {
@@ -87,7 +87,7 @@ namespace tcp {
         return *this;
     }
 
-    const Descriptor & Connection::get_descriptor() const {
+    const Descriptor & Connection::getDescriptor() const {
         return descriptor_;
     }
 
