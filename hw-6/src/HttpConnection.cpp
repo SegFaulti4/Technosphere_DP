@@ -1,46 +1,46 @@
 #include "HttpConnection.h"
-#include <iostream>
+#include "HttpException.h"
+#include "log.h"
 
 namespace http {
 
-    const std::string AllowedRequestMethods[] = {
+    const std::string ALLOWED_REQUEST_METHODS[] = {
             "GET"
     };
 
-    const std::string AllowedTypeVersions[] = {
+    const std::string ALLOWED_TYPE_VERSIONS[] = {
             "HTTP/1.1",
             "HTTP/1.0"
     };
 
-    const std::string AllowedMessageHeaders[] = {
+    const std::string ALLOWED_MESSAGE_HEADERS[] = {
             "Connection: ",
             "Content-Length: "
     };
 
-    constexpr int max_request_line_length = 4096;
-    constexpr int max_message_headers_length = 4096;
+    constexpr int MAX_REQUEST_LINE_LENGTH = 4096;
+    constexpr int MAX_MESSAGE_HEADER_LENGTH = 4096;
 
-    HttpConnection::HttpConnection(net::BufferedConnection && buf_con) :
-            connection_(std::move(buf_con)) {
-        connection_.setEpollData(this);
+    HttpConnection::HttpConnection(tcp::Connection && con, net::EPoll &epoll)
+            : net::BufferedConnection(std::move(con), epoll) {
+        subscription_ = EPOLLET | EPOLLONESHOT | EPOLLIN | EPOLLRDHUP;
     }
 
-    HttpConnection::HttpConnection(HttpConnection && other)  noexcept : connection_(std::move(other.connection_)) {
+    HttpConnection::HttpConnection(HttpConnection && other) noexcept : net::BufferedConnection(std::move(other)) {
         request_ = std::move(other.request_);
-        request_available_ = other.request_available_;
+        other.request_.clear();
+        request_available_ = std::exchange(other.request_available_, false);
         last_used_ = other.last_used_;
-        subscription_ = other.subscription_;
-        connection_.setEpollData(this);
+        setEpollData(this);
     }
 
-    HttpConnection & HttpConnection::operator=(HttpConnection && other)  noexcept {
-        if (connection_.getDescriptor().getFd() != other.connection_.getDescriptor().getFd()) {
-            connection_ = std::move(other.connection_);
+    HttpConnection & HttpConnection::operator=(HttpConnection && other) noexcept {
+        if (this != &other) {
+            last_used_ = other.last_used_;
             request_ = std::move(other.request_);
             request_available_ = other.request_available_;
-            subscription_ = other.subscription_;
-            last_used_ = other.last_used_;
-            connection_.setEpollData(this);
+            setEpollData(this);
+            reinterpret_cast<net::BufferedConnection *>(this)->operator=(std::move(other));
         }
         return *this;
     }
@@ -51,7 +51,7 @@ namespace http {
         }
         while (true) {
             try {
-                connection_.readIntoBuf();
+                readIntoBuf();
             } catch (tcp::TcpBlockException &) {
                 break;
             } catch (net::NetException &) {
@@ -59,17 +59,17 @@ namespace http {
             } catch (std::exception &exc) {
                 throw exc;
             }
-            std::string &str = connection_.getReadBuf();
-            log::info("mode: " + std::to_string(mode_));
+            std::string &str = read_buf_;
+            log::info("mode: " + std::to_string(static_cast<int>(mode_)));
             switch (mode_) {
 
-                case REQUEST_LINE: {
+                case HttpParserMode::REQUEST_LINE: {
                     int pos = 0;
                     int end_of_req_line = str.find("\r\n", pos);
                     if (end_of_req_line != std::string::npos) {
                         log::info("end req line found");
                         std::string tmp;
-                        for (const std::string &method : AllowedRequestMethods) {
+                        for (const std::string &method : ALLOWED_REQUEST_METHODS) {
                             if (str.find(method, pos) == pos) {
                                 tmp = method;
                                 break;
@@ -90,7 +90,7 @@ namespace http {
                         request_["URI"] = str.substr(pos + 1, tmp_pos - pos);
                         pos = tmp_pos + 1;
                         tmp.clear();
-                        for (const std::string &type_version : AllowedTypeVersions) {
+                        for (const std::string &type_version : ALLOWED_TYPE_VERSIONS) {
                             if (str.find(type_version, pos) == pos) {
                                 tmp = type_version;
                                 break;
@@ -106,33 +106,33 @@ namespace http {
                         request_["type"] = str.substr(pos, tmp_pos - pos);
                         request_["version"] = str.substr(tmp_pos + 1, end_of_req_line - tmp_pos - 1);
                         str.erase(0, end_of_req_line + 2);
-                        mode_ = MESSAGE_HEADERS;
+                        mode_ = HttpParserMode::MESSAGE_HEADERS;
                     } else {
-                        if (str.size() > max_request_line_length) {
+                        if (str.size() > MAX_REQUEST_LINE_LENGTH) {
                             throw HttpException("Request line size exceeded");
                         }
                         break;
                     }
                 }
 
-                case MESSAGE_HEADERS: {
+                case HttpParserMode::MESSAGE_HEADERS: {
                     int pos;
                     while ((pos = str.find("\r\n")) != std::string::npos) {
                         if (str.find("\r\n") == 0) {
                             str.erase(0, 2);
                             if (request_.find("Content-Length") != request_.end()) {
-                                mode_ = MESSAGE_BODY;
+                                mode_ = HttpParserMode::MESSAGE_BODY;
                             } else {
                                 if (!str.empty()) {
                                     throw HttpException("Only one request is allowed at a time");
                                 }
                                 request_available_ = true;
-                                mode_ = REQUEST_LINE;
+                                mode_ = HttpParserMode::REQUEST_LINE;
                             }
                             break;
                         }
                         std::string tmp;
-                        for (const std::string &message_header : AllowedMessageHeaders) {
+                        for (const std::string &message_header : ALLOWED_MESSAGE_HEADERS) {
                             if (str.find(message_header)) {
                                 tmp = message_header;
                             }
@@ -147,15 +147,15 @@ namespace http {
                         request_[tmp] = str.substr(tmp.size() + 2, pos);
                         str.erase(0, pos + 2);
                     }
-                    if (mode_ != MESSAGE_BODY) {
-                        if (str.size() > max_message_headers_length) {
+                    if (mode_ != HttpParserMode::MESSAGE_BODY) {
+                        if (str.size() > MAX_MESSAGE_HEADER_LENGTH) {
                             throw HttpException("Message header size exceeded");
                         }
                         break;
                     }
                 }
 
-                case MESSAGE_BODY: {
+                case HttpParserMode::MESSAGE_BODY: {
                     int pos = str.find("\r\n\r\n");
                     if (pos != std::string::npos) {
                         if (str.size() - pos - 4 > 0) {
@@ -167,7 +167,7 @@ namespace http {
                         request_["body"] = str.substr(0, pos);
                         request_available_ = true;
                         str.erase(0, pos + 4);
-                        mode_ = REQUEST_LINE;
+                        mode_ = HttpParserMode::REQUEST_LINE;
                         break;
                     } else if (str.size() > std::stoi(request_["Content-Length"])) {
                         throw HttpException("Message body size exceeded");
@@ -182,7 +182,7 @@ namespace http {
     void HttpConnection::writeUntilEagain() {
         while (isWriting()) {
             try {
-                connection_.writeFromBuf();
+                writeFromBuf();
             } catch (tcp::TcpBlockException &) {
                 break;
             } catch (net::NetException &) {
@@ -202,37 +202,54 @@ namespace http {
     }
 
     void HttpConnection::refreshTime() {
+        watchdog_refresh_flag_ = false;
         last_used_ = steady_clock::now();
     }
 
     void HttpConnection::resubscribe() {
-        connection_.ctl(EPOLL_CTL_MOD, subscription_);
-        refreshTime();
+        epoll_.mod(connection_.getDescriptor(), epoll_data_, subscription_);
     }
 
     bool HttpConnection::isWriting() {
-        return !connection_.getWriteBuf().empty();
+        return !write_buf_.empty();
     }
 
     bool HttpConnection::isValid() {
         return connection_.getDescriptor().isValid();
     }
 
+    bool HttpConnection::refreshIsDelayed() {
+        return watchdog_refresh_flag_;
+    }
+
+    void HttpConnection::setDelayedRefresh() {
+        watchdog_refresh_flag_ = true;
+    }
+
     const tcp::Descriptor & HttpConnection::getDescriptor() const {
-        return connection_.getDescriptor();
+        return reinterpret_cast<const net::BufferedConnection *>(this)->getDescriptor();
     }
 
     void HttpConnection::close() {
         connection_.close();
         subscription_ = 0;
         request_.clear();
-        mode_ = REQUEST_LINE;
+        mode_ = HttpParserMode::REQUEST_LINE;
         request_available_ = false;
     }
 
+    void HttpConnection::setEpollData(void * ptr) {
+        reinterpret_cast<net::BufferedConnection *>(this)->setEpollData(ptr);
+    }
+
     void HttpConnection::openEpoll() {
-        connection_.setEpollData(this);
-        connection_.ctl(EPOLL_CTL_ADD, subscription_);
+        reinterpret_cast<net::BufferedConnection *>(this)->openEpoll();
+        log::info(std::to_string(connection_.getDescriptor().getFd()) + " " + std::to_string((long long) this)
+                + " " + std::to_string((long long) epoll_data_) + " " + std::to_string(subscription_));
+    }
+
+    void HttpConnection::unsubscribe(net::EventSubscribe event) {
+        reinterpret_cast<net::BufferedConnection *>(this)->unsubscribe(event);
     }
 
     std::mutex & HttpConnection::getMutex() {
@@ -248,23 +265,10 @@ namespace http {
         request_available_ = false;
     }
 
-    void HttpConnection::subscribe(net::EventSubscribe event) {
-        if (subscription_ ^ event) {
-            subscription_ |= event;
-            connection_.ctl(EPOLL_CTL_MOD, subscription_);
-        }
-    }
-
-    void HttpConnection::unsubscribe(net::EventSubscribe event) {
-        if (event & subscription_) {
-            subscription_ ^= event;
-            connection_.ctl(EPOLL_CTL_MOD, subscription_);
-        }
-    }
 
     void HttpConnection::writeResponse(const std::string &response) {
-        connection_.getWriteBuf().append(response);
-        subscribe(net::WRITE);
+        write_buf_.append(response);
+        subscribe(net::EventSubscribe::WRITE);
     }
 
 }

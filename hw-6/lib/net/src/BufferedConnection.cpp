@@ -3,24 +3,23 @@
 
 namespace net {
 
-    constexpr size_t max_read_length_ = 4096;
+    constexpr size_t MAX_READ_LENGTH = 4096;
 
-    BufferedConnection::BufferedConnection(tcp::Connection con, EPoll & epoll) :
+    BufferedConnection::BufferedConnection(tcp::Connection && con, EPoll & epoll) :
             epoll_(epoll), connection_(std::move(con)){
-        epoll_data_ = this;
+        setEpollData(this);
     }
 
     BufferedConnection::BufferedConnection(BufferedConnection && other) noexcept  : epoll_(other.epoll_),
             connection_(std::move(other.connection_)) {
         read_buf_ = std::move(other.read_buf_);
         write_buf_ = std::move(other.write_buf_);
-        epoll_data_ = other.epoll_data_;
-        subscription_ = other.subscription_;
+        epoll_data_ = std::exchange(other.epoll_data_, nullptr);
+        subscription_ = std::exchange(other.subscription_, 0);
     }
 
     void BufferedConnection::openEpoll() {
-        epoll_data_ = this;
-        epoll_.ctl(EPOLL_CTL_ADD, connection_.getDescriptor().getFd(), epoll_data_, subscription_);
+        epoll_.add(connection_.getDescriptor(), epoll_data_, subscription_);
     }
 
     void BufferedConnection::close() {
@@ -31,16 +30,16 @@ namespace net {
     }
 
     void BufferedConnection::subscribe(EventSubscribe event) {
-        if (subscription_ ^ event) {
-            subscription_ |= event;
-            epoll_.ctl(EPOLL_CTL_MOD, connection_.getDescriptor().getFd(), epoll_data_, subscription_);
+        if (subscription_ ^ static_cast<int>(event)) {
+            subscription_ |= static_cast<int>(event);
+            epoll_.mod(connection_.getDescriptor(), epoll_data_, subscription_);
         }
     }
 
     void BufferedConnection::unsubscribe(EventSubscribe event) {
-        if (event & subscription_) {
-            subscription_ ^= event;
-            epoll_.ctl(EPOLL_CTL_MOD, connection_.getDescriptor().getFd(), epoll_data_, subscription_);
+        if (static_cast<int>(event) & subscription_) {
+            subscription_ ^= static_cast<int>(event);
+            epoll_.mod(connection_.getDescriptor(), epoll_data_, subscription_);
         }
     }
 
@@ -49,9 +48,9 @@ namespace net {
     }
 
     void BufferedConnection::readIntoBuf() {
-        read_buf_.resize(read_buf_.size() + max_read_length_);
-        size_t res = connection_.read(read_buf_.data() + read_buf_.size() - max_read_length_, max_read_length_);
-        read_buf_.resize(read_buf_.size() - max_read_length_ + res);
+        read_buf_.resize(read_buf_.size() + MAX_READ_LENGTH);
+        size_t res = connection_.read(read_buf_.data() + read_buf_.size() - MAX_READ_LENGTH, MAX_READ_LENGTH);
+        read_buf_.resize(read_buf_.size() - MAX_READ_LENGTH + res);
         if (!res) {
             throw NetException("Nothing was read");
         }
@@ -71,10 +70,6 @@ namespace net {
 
     std::string & BufferedConnection::getWriteBuf() {
         return write_buf_;
-    }
-
-    void BufferedConnection::ctl(int op, int event) {
-        epoll_.ctl(op, connection_.getDescriptor().getFd(), epoll_data_, event);
     }
 
     void BufferedConnection::setEpollData(void *ptr) {

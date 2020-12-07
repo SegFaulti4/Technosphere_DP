@@ -2,15 +2,15 @@
 #define TCP_SERVER_H
 
 #include "Connection.h"
-#include "TcpException.h"
+#include <arpa/inet.h>
 
 namespace tcp {
 
     class Server {
     private:
         Descriptor descriptor_;
-        void setTimeout_(ssize_t ms, int opt);
-        void listen_(unsigned addr, unsigned port, int max_connection);
+        void setTimeout(ssize_t ms, int opt);
+        void listen_(unsigned addr, unsigned port, int max_connection); // перекрывает публичный метод
 
     public:
         Server();
@@ -19,8 +19,7 @@ namespace tcp {
                int max_connection = SOMAXCONN);
         Server(unsigned addr, unsigned port, int max_connection = SOMAXCONN);
 
-        void listen(const std::string & addr, unsigned port,
-                  int max_connection = SOMAXCONN);
+        void listen(const std::string & addr, unsigned port, int max_connection = SOMAXCONN);
         void listen(unsigned addr, unsigned port, int max_connection = SOMAXCONN);
         void close();
         Connection accept();

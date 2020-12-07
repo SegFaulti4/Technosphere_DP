@@ -1,14 +1,8 @@
 #ifndef TCP_CONNECTION_H
 #define TCP_CONNECTION_H
 
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <netinet/ip.h>
-#include <arpa/inet.h>
-#include <string>
-#include <climits>
-#include "TcpException.h"
 #include "Descriptor.h"
+#include <string>
 
 namespace tcp {
 
@@ -16,17 +10,14 @@ namespace tcp {
     private:
         Descriptor descriptor_;
         explicit Connection(int socket);
-        void setTimeout_(ssize_t ms, int opt);
-        void connect_(unsigned addr, unsigned port);
+        void setTimeout(ssize_t ms, int opt);
+        void connect_(unsigned addr, unsigned port); // перекрывает публичный метод
 
     public:
-        Connection();
+        Connection() = default;
         Connection(const std::string & addr, unsigned port);
         Connection(unsigned addr, unsigned port);
-        Connection(Connection && other) noexcept;
-        ~Connection() = default;
 
-        Connection& operator=(Connection && other) noexcept;
         void connect(const std::string & addr, unsigned port);
         void connect(unsigned addr, unsigned port);
         void close();

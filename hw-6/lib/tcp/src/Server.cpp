@@ -1,4 +1,5 @@
 #include "Server.h"
+#include "TcpException.h"
 
 namespace tcp {
 
@@ -53,11 +54,11 @@ namespace tcp {
     }
 
     Connection Server::accept() {
-        sockaddr_in client_addr = {};
+        sockaddr_in client_addr{};
         socklen_t addr_size = sizeof(client_addr);
-
-        int acc_socket = ::accept4(descriptor_.getFd(),reinterpret_cast<sockaddr*>(&client_addr),
-                                  &addr_size, SOCK_NONBLOCK);
+        int fd = descriptor_.getFd();
+        auto addr = reinterpret_cast<sockaddr*>(&client_addr);
+        int acc_socket = ::accept4(fd, addr, &addr_size, SOCK_NONBLOCK);
         if (acc_socket == -1) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
                 throw TcpBlockException("Accept would block");
@@ -79,8 +80,10 @@ namespace tcp {
         }
     }
 
-    void Server::setTimeout_(ssize_t ms, int opt) {
-        timeval timeout{ .tv_sec = ms / 1000, .tv_usec = ms % 1000};
+    void Server::setTimeout(ssize_t ms, int opt) {
+        timeval timeout{};
+        timeout.tv_sec = ms / 1000;
+        timeout.tv_usec = (ms % 1000) * 1000;
         if (setsockopt(descriptor_.getFd(), SOL_SOCKET, opt,
                        &timeout, sizeof(timeout)) == -1) {
             throw TcpException("Socket option set error");
@@ -88,8 +91,8 @@ namespace tcp {
     }
 
     void Server::setTimeout(ssize_t ms) {
-        setTimeout_(ms, SO_SNDTIMEO);
-        setTimeout_(ms, SO_RCVTIMEO);
+        setTimeout(ms, SO_SNDTIMEO);
+        setTimeout(ms, SO_RCVTIMEO);
     }
 
     Server & Server::operator=(Server &&other) noexcept {

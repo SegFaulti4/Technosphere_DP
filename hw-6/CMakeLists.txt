@@ -5,16 +5,16 @@ set(CMAKE_CXX_FLAGS -pthread)
 set(CMAKE_CXX_STANDARD 17)
 
 set(TCP_LIB_NAME tcp)
-set(TCP_LIB_INCLUDE lib/tcp)
-set(TCP_LIB_SRC lib/tcp/Connection.cpp lib/tcp/Descriptor.cpp lib/tcp/Server.cpp)
+set(TCP_LIB_INCLUDE lib/tcp/include)
+set(TCP_LIB_SRC lib/tcp/src/Connection.cpp lib/tcp/src/Descriptor.cpp lib/tcp/src/Server.cpp)
 
 set(NET_LIB_NAME net)
-set(NET_LIB_INCLUDE lib/net)
-set(NET_LIB_SRC lib/net/BufferedConnection.cpp lib/net/EPoll.cpp lib/net/Service.cpp)
+set(NET_LIB_INCLUDE lib/net/include)
+set(NET_LIB_SRC lib/net/src/BufferedConnection.cpp lib/net/src/EPoll.cpp lib/net/src/Service.cpp)
 
 set(LOGGER_LIB_NAME logger)
-set(LOGGER_LIB_INCLUDE lib/logger)
-set(LOGGER_LIB_SRC lib/logger/BaseLogger.cpp lib/logger/Global.cpp lib/logger/Logger.cpp)
+set(LOGGER_LIB_INCLUDE lib/logger/include)
+set(LOGGER_LIB_SRC lib/logger/src/BaseLogger.cpp lib/logger/src/Global.cpp lib/logger/src/Logger.cpp)
 
 set(PROJECT_SRC src/HttpService.cpp src/HttpConnection.cpp)
 set(PROJECT_INCLUDE include)

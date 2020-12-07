@@ -2,11 +2,9 @@
 #define HTTP_HTTPCONNECTION_H
 
 #include "net.h"
-#include "log.h"
-#include "HttpException.h"
 #include <map>
-#include <vector>
 #include <chrono>
+#include <mutex>
 
 namespace http {
 
@@ -15,41 +13,42 @@ namespace http {
     using HttpRequest = std::map<std::string, std::string>;
     using ms = std::chrono::milliseconds;
 
-    class HttpConnection {
+    class HttpConnection : private net::BufferedConnection {
     private:
-        enum HttpParserMode {
+        enum class HttpParserMode {
             REQUEST_LINE = 0,
             MESSAGE_HEADERS = 1,
             MESSAGE_BODY = 2
         };
 
-        net::BufferedConnection connection_;
         HttpRequest request_;
         bool request_available_ = false;
-        HttpParserMode mode_ = REQUEST_LINE;
+        bool watchdog_refresh_flag_ = false;
+        HttpParserMode mode_ = HttpParserMode::REQUEST_LINE;
         time_point last_used_ = steady_clock::now();
-        int subscription_ = EPOLLET | EPOLLONESHOT | EPOLLIN | EPOLLRDHUP;
         std::mutex mutex_;
 
     public:
-        explicit HttpConnection(net::BufferedConnection && buf_con);
-        ~HttpConnection() = default;
+        HttpConnection(tcp::Connection && con, net::EPoll &epoll);
         HttpConnection(HttpConnection && other) noexcept;
+        ~HttpConnection() = default;
 
-        void openEpoll();
         void close();
+        void setEpollData(void * ptr);
+        void openEpoll();
         void readUntilEagain();
         void writeUntilEagain();
-        void subscribe(net::EventSubscribe event);
         void unsubscribe(net::EventSubscribe event);
         void resubscribe();
         void refreshTime();
         int downtimeDuration();
         bool isWriting();
         bool isValid();
+        bool refreshIsDelayed();
+        void setDelayedRefresh();
         bool requestAvailable() const;
-        const tcp::Descriptor & getDescriptor() const;
         std::mutex & getMutex();
+        const tcp::Descriptor & getDescriptor() const;
 
         HttpRequest & getRequest();
         void clearRequest();

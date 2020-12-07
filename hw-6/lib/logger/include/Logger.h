@@ -2,6 +2,7 @@
 #define LOG_LOGGER_H
 
 #include "BaseLogger.h"
+#include <memory>
 
 namespace log {
 

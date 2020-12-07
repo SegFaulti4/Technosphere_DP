@@ -1,12 +1,13 @@
-#include <iostream>
 #include "HttpService.h"
+#include "HttpException.h"
+#include <thread>
 
 namespace http {
 
-    constexpr size_t event_queue_size = 1024;
-    constexpr int max_downtime = 2000;
-    constexpr int max_connection_amount = 10000;
-    constexpr int watchdog_period = 10;
+    constexpr size_t EVENT_QUEUE_SIZE = 1024;
+    constexpr int MAX_DOWNTIME = 2000;
+    constexpr int MAX_CONNECTION_AMOUNT = 10000;
+    constexpr int WATCHDOG_PERIOD = 10;
 
     HttpService::HttpService(unsigned worker_amount, IHttpServiceListener * listener) {
         worker_amount_ = worker_amount;
@@ -26,7 +27,7 @@ namespace http {
     }
 
     void HttpService::close() {
-        setRunning_(false);
+        setRunning(false);
         server_.close();
     }
 
@@ -35,39 +36,19 @@ namespace http {
             std::vector<std::thread> threads;
             threads.reserve(worker_amount_);
             for (int i = 0; i < worker_amount_; i++) {
-                threads.emplace_back(&http::HttpService::workerRun_, this);
+                threads.emplace_back(&http::HttpService::workerRun, this);
             }
-            setRunning_(true);
-            server_.setTimeout(watchdog_period);
+            setRunning(true);
+            server_.setTimeout(WATCHDOG_PERIOD);
             while (isRunning()) {
-                if (opened_connections_amount_ < max_connection_amount) {
-                    try {
-                        HttpConnection http_con(net::BufferedConnection(server_.accept(), client_epoll_));
-                        log::info("New connection");
-                        opened_connections_amount_++;
-                        if (available_connections_.empty()) {
-                            log::info("No connections available");
-                            addConnection_(std::move(http_con));
-                        } else {
-                            {
-                                std::lock_guard lock(queue_mutex_);
-                                auto con = available_connections_.front();
-                                *con = std::move(http_con);
-                                con->openEpoll();
-                                available_connections_.pop();
-                            }
-                        }
-                    } catch (tcp::TcpBlockException &) {
-                        log::debug("Accept would block");
-                    } catch (std::exception &exc) {
-                        throw exc;
-                    }
+                if (opened_connections_amount_ < MAX_CONNECTION_AMOUNT) {
+                    addConnection();
                 } else {
                     log::warn("Max connection amount reached");
-                    std::this_thread::sleep_for(std::chrono::milliseconds(watchdog_period));
+                    std::this_thread::sleep_for(std::chrono::milliseconds(WATCHDOG_PERIOD));
                 }
-                if (watchdogDowntimeDuration_() > watchdog_period) {
-                    watchdog_();
+                if (watchdogDowntimeDuration() > WATCHDOG_PERIOD) {
+                    watchdog();
                 }
             }
             for (std::thread& t : threads) {
@@ -76,22 +57,47 @@ namespace http {
         }
     }
 
-    void HttpService::closeConnection_(HttpConnection & http_con) {
-        {
-            opened_connections_amount_--;
+    void HttpService::closeConnection(HttpConnection & http_con) {
+        std::lock_guard lock(queue_mutex_);
+        opened_connections_amount_--;
+        http_con.close();
+        log::info("Closed connection valid " + std::to_string(http_con.isValid()));
+        available_connections_.push(&http_con);
+    }
+
+    void HttpService::addConnection() {
+        try {
+            HttpConnection http_con(server_.accept(), client_epoll_);
+            log::info("New connection");
+            opened_connections_amount_++;
             std::lock_guard lock(queue_mutex_);
-            http_con.close();
-            log::info("Closed connection valid " + std::to_string(http_con.isValid()));
-            available_connections_.push(&http_con);
+            if (available_connections_.empty()) {
+                log::info("No connections available");
+                connections_.emplace_back(std::move(http_con));
+                pushTimingConnection(connections_.back());
+                connections_.back().setEpollData(&connections_.back());
+                connections_.back().openEpoll();
+            } else {
+                auto con = available_connections_.front();
+                *con = std::move(http_con);
+                pushTimingConnection(*con);
+                con->setEpollData(con);
+                available_connections_.pop();
+                con->openEpoll();
+            }
+        } catch (tcp::TcpBlockException &) {
+            log::debug("Accept would block");
+        } catch (std::exception &exc) {
+            throw exc;
         }
     }
 
-    void HttpService::addConnection_(HttpConnection && http_con) {
-        connections_.emplace_back(std::move(http_con));
-        connections_.back().openEpoll();
+    void HttpService::pushTimingConnection(HttpConnection & http_con) {
+        timing_connections_.push_back(&http_con);
+        http_con.refreshTime();
     }
 
-    void HttpService::setRunning_(bool b) {
+    void HttpService::setRunning(bool b) {
         running_ = b;
     }
 
@@ -99,8 +105,8 @@ namespace http {
         return running_;
     }
 
-    void HttpService::workerRun_() {
-        std::array<::epoll_event, event_queue_size> event_queue{};
+    void HttpService::workerRun() {
+        std::array<::epoll_event, EVENT_QUEUE_SIZE> event_queue{};
         while (isRunning() || opened_connections_amount_) {
             int events_count = client_epoll_.wait(event_queue.data(), event_queue.size(), -1);
             log::info("client event: " + std::to_string(events_count));
@@ -109,8 +115,8 @@ namespace http {
                     throw HttpException("Invalid event ptr");
                 }
                 HttpConnection & http_con = *reinterpret_cast<HttpConnection *>(event_queue[i].data.ptr);
+                std::lock_guard lock(http_con.getMutex());
                 if (http_con.isValid()) {
-                    std::lock_guard lock(http_con.getMutex());
                     log::debug(std::to_string(http_con.getDescriptor().getFd()) + " "
                             + std::to_string((long long)event_queue[i].data.ptr));
 
@@ -124,8 +130,8 @@ namespace http {
                         log::info("OUT");
                         http_con.writeUntilEagain();
                         if (!http_con.isWriting()) {
-                            http_con.refreshTime();
-                            http_con.unsubscribe(net::WRITE);
+                            http_con.setDelayedRefresh();
+                            http_con.unsubscribe(net::EventSubscribe::WRITE);
                         } else {
                             http_con.resubscribe();
                         }
@@ -142,10 +148,10 @@ namespace http {
                                     keep_alive = true;
                                 }
                                 log::info("keep-alive " + std::to_string(keep_alive));
-                                http_con.refreshTime();
+                                http_con.setDelayedRefresh();
                                 listener_->onRequest(http_con);
                                 if (!keep_alive && !http_con.isWriting()) {
-                                    closeConnection_(http_con);
+                                    closeConnection(http_con);
                                 }
                             }
                         }
@@ -158,24 +164,28 @@ namespace http {
         }
     }
 
-    int HttpService::watchdogDowntimeDuration_() {
+    int HttpService::watchdogDowntimeDuration() {
         return std::chrono::duration_cast<ms>(steady_clock::now() - last_watchdog_run_).count();
     }
 
-    void HttpService::watchdog_() {
-        log::info("watchdog");
-        for (auto it = connections_.begin(); it != connections_.end();) {
-            {
-                HttpConnection &http_con = *it;
-                std::lock_guard lock(http_con.getMutex());
-                log::info("(watchdog) is valid: " + std::to_string(http_con.isValid()));
-                log::info("(watchdog) write ongoing: " + std::to_string(http_con.isWriting()));
-                if (http_con.isValid() && (http_con.downtimeDuration() > max_downtime)) {
-                    it++;
-                    closeConnection_(http_con);
-                } else {
-                    it++;
+    void HttpService::watchdog() {
+        for (auto it = timing_connections_.begin(); it != timing_connections_.end();) {
+            HttpConnection & http_con = **it;
+            std::lock_guard lock(http_con.getMutex());
+            if (http_con.refreshIsDelayed()) {
+                auto prev_it = it;
+                it++;
+                timing_connections_.erase(prev_it);
+                pushTimingConnection(http_con);
+            } else if (http_con.downtimeDuration() > MAX_DOWNTIME) {
+                auto prev_it = it;
+                it++;
+                timing_connections_.erase(prev_it);
+                if (http_con.isValid()) {
+                    closeConnection(http_con);
                 }
+            } else {
+                break;
             }
         }
         last_watchdog_run_ = steady_clock::now();

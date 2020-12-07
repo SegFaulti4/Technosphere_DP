@@ -1,9 +1,7 @@
 #ifndef HTTP_HTTPEXCEPTION_H
 #define HTTP_HTTPEXCEPTION_H
 
-#include <stdexcept>
 #include "NetException.h"
-#include "log.h"
 
 namespace http {
 

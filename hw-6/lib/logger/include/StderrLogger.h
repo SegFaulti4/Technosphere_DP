@@ -2,7 +2,6 @@
 #define HW_2_STDERRLOGGER_H
 
 #include "BaseLogger.h"
-#include <iostream>
 
 namespace log {
 

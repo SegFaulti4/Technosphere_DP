@@ -2,9 +2,6 @@
 #define HW_2_FILELOGGER_H
 
 #include "BaseLogger.h"
-#include "fcntl.h"
-#include "unistd.h"
-#include <stdexcept>
 #include <fstream>
 
 namespace log {

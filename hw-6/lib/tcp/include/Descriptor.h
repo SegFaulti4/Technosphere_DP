@@ -1,12 +1,7 @@
 #ifndef TCP_DESCRIPTOR_H
 #define TCP_DESCRIPTOR_H
 
-#include <string>
-#include "fcntl.h"
-#include <stdexcept>
-#include <utility>
-#include "unistd.h"
-#include "TcpException.h"
+#include <sys/types.h>
 
 namespace tcp {
 

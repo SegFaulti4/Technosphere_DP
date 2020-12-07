@@ -2,10 +2,8 @@
 #define HTTP_HTTPSERVICE_H
 
 #include "HttpConnection.h"
-#include "HttpException.h"
 #include "net.h"
 #include "log.h"
-#include <thread>
 #include <queue>
 #include <atomic>
 #include <list>
@@ -18,8 +16,9 @@ namespace http {
         virtual void onRequest(HttpConnection & http_connection) = 0;
     };
 
-    using HttpConnectionList = std::list<HttpConnection>;
-    using HttpConnectionQueue = std::queue<HttpConnection *>;
+    using ConnectionList = std::list<HttpConnection>;
+    using ConnectionPtrList = std::list<HttpConnection *>;
+    using ConnectionPtrQueue = std::queue<HttpConnection *>;
     using steady_clock = std::chrono::steady_clock;
     using time_point = std::chrono::time_point<steady_clock>;
     using HttpRequest = std::map<std::string, std::string>;
@@ -28,8 +27,9 @@ namespace http {
     class HttpService {
     private:
         IHttpServiceListener * listener_;
-        HttpConnectionList connections_;
-        HttpConnectionQueue available_connections_;
+        ConnectionList connections_;
+        ConnectionPtrQueue available_connections_;
+        ConnectionPtrList timing_connections_;
         tcp::Server server_;
         net::EPoll client_epoll_;
         std::mutex queue_mutex_;
@@ -38,12 +38,13 @@ namespace http {
         std::atomic<int> opened_connections_amount_ = 0;
         time_point last_watchdog_run_ = steady_clock::now();
 
-        void workerRun_();
-        void closeConnection_(HttpConnection & http_con);
-        void addConnection_(HttpConnection && http_con);
-        void watchdog_();
-        void setRunning_(bool b);
-        int watchdogDowntimeDuration_();
+        void workerRun();
+        void closeConnection(HttpConnection & http_con);
+        void addConnection();
+        void pushTimingConnection(HttpConnection & http_con);
+        void watchdog();
+        void setRunning(bool b);
+        int watchdogDowntimeDuration();
 
     public:
         explicit HttpService(unsigned worker_amount = 1, IHttpServiceListener * listener = nullptr);

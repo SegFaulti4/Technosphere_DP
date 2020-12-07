@@ -1,8 +1,10 @@
 #include "Service.h"
+#include <memory>
+#include "NetException.h"
 
 namespace net {
 
-    constexpr size_t event_queue_size_ = 1024;
+    constexpr size_t EVENT_QUEUE_SIZE = 1024;
 
     void Service::closeConnection_(int fd) {
         auto closed_con = connections_.find(fd);
@@ -22,23 +24,23 @@ namespace net {
 
     void Service::open(unsigned addr, unsigned port, int max_connection) {
         server_.listen(addr, port, max_connection);
-        epoll_.ctl(EPOLL_CTL_ADD, server_.getDescriptor().getFd(), epoll_data_, EPOLLRDHUP | EPOLLIN);
+        epoll_.add(server_.getDescriptor(), epoll_data_, EPOLLRDHUP | EPOLLIN);
     }
 
     void Service::open(const std::string & addr, unsigned port, int max_connection) {
         server_.listen(addr, port, max_connection);
-        epoll_.ctl(EPOLL_CTL_ADD, server_.getDescriptor().getFd(), epoll_data_, EPOLLRDHUP | EPOLLIN);
+        epoll_.add(server_.getDescriptor(), epoll_data_, EPOLLRDHUP | EPOLLIN);
     }
 
     void Service::close() {
         setRunning(false);
-        epoll_.del(server_.getDescriptor().getFd(), epoll_data_);
+        epoll_.del(server_.getDescriptor(), epoll_data_);
         server_.close();
     }
 
     void Service::run() {
         if (!isRunning()) {
-            std::array<::epoll_event, event_queue_size_> event_queue{};
+            std::array<::epoll_event, EVENT_QUEUE_SIZE> event_queue{};
             setRunning(true);
             while (isRunning()) {
                 int server_fd = server_.getDescriptor().getFd();

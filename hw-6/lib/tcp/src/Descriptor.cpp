@@ -1,4 +1,8 @@
 #include "Descriptor.h"
+#include <string>
+#include <utility>
+#include "unistd.h"
+#include "TcpException.h"
 
 namespace tcp {
 
@@ -11,7 +15,9 @@ namespace tcp {
     }
 
     Descriptor::~Descriptor() {
-        ::close(fd_);
+        try {
+            close();
+        } catch(std::exception &) {}
     }
 
     void Descriptor::close() {
@@ -67,7 +73,8 @@ namespace tcp {
         size_t cur = 0;
         size_t res;
         while (cur < len) {
-            if (!(res = write(static_cast<const char *>(data) + cur, len - cur))) {
+            res = write(static_cast<const char *>(data) + cur, len - cur);
+            if (res == 0) {
                 throw TcpException("Write exact failed");
             }
             cur += res;
@@ -87,7 +94,7 @@ namespace tcp {
 
     Descriptor &Descriptor::operator=(Descriptor &&other) noexcept {
         if (this != &other) {
-            std::swap(fd_, other.fd_);
+            fd_ = std::exchange(other.fd_, -1);
         }
         return *this;
     }

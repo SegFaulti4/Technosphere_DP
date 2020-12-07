@@ -1,10 +1,8 @@
 #ifndef NET_SERVICE_H
 #define NET_SERVICE_H
 
-#include <memory>
 #include <map>
 #include "tcp.h"
-#include "NetException.h"
 #include "BufferedConnection.h"
 #include "EPoll.h"
 
@@ -33,7 +31,7 @@ namespace net {
         bool running_ = false;
         void * epoll_data_;
 
-        void closeConnection_(int fd);
+        void closeConnection_(int fd); // перекрывает публичный метод
 
     public:
         explicit Service(IServiceListener * listener = nullptr);

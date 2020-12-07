@@ -1,8 +1,12 @@
 #include "Connection.h"
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <netinet/ip.h>
+#include <arpa/inet.h>
+#include <climits>
+#include "TcpException.h"
 
 namespace tcp {
-
-    Connection::Connection() = default;
 
     Connection::Connection(const std::string & addr, unsigned port) {
         connect(addr, port);
@@ -10,10 +14,6 @@ namespace tcp {
 
     Connection::Connection(unsigned addr, unsigned port) {
         connect(addr, port);
-    }
-
-    Connection::Connection(Connection && other) noexcept {
-        *this = std::move(other);
     }
 
     Connection::Connection(int socket) {
@@ -69,7 +69,7 @@ namespace tcp {
         descriptor_.writeExact(buf, count);
     }
 
-    void Connection::setTimeout_(ssize_t ms, int opt) {
+    void Connection::setTimeout(ssize_t ms, int opt) {
         timeval timeout{ .tv_sec = ms / 1000, .tv_usec = ms % 1000};
         if (setsockopt(descriptor_.getFd(), SOL_SOCKET, opt,
                        &timeout, sizeof(timeout)) == -1) {
@@ -78,13 +78,8 @@ namespace tcp {
     }
 
     void Connection::setTimeout(ssize_t ms) {
-        setTimeout_(ms, SO_SNDTIMEO);
-        setTimeout_(ms, SO_RCVTIMEO);
-    }
-
-    Connection & Connection::operator=(Connection && other) noexcept {
-        this->descriptor_ = std::move(other.descriptor_);
-        return *this;
+        setTimeout(ms, SO_SNDTIMEO);
+        setTimeout(ms, SO_RCVTIMEO);
     }
 
     const Descriptor & Connection::getDescriptor() const {

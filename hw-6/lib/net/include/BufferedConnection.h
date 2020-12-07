@@ -2,13 +2,19 @@
 #define NET_BUFFEREDCONNECTION_H
 
 #include "tcp.h"
-#include "NetException.h"
 #include "EPoll.h"
 
 namespace net {
 
+    enum class EventSubscribe {
+        NOTHING = 0,
+        READ = EPOLLIN,
+        WRITE = EPOLLOUT,
+        READWRITE = EPOLLIN | EPOLLOUT
+    };
+
     class BufferedConnection {
-    private:
+    protected:
         int subscription_ = EPOLLRDHUP;
         std::string read_buf_;
         std::string write_buf_;
@@ -17,10 +23,11 @@ namespace net {
         void * epoll_data_;
 
     public:
-        BufferedConnection(tcp::Connection con, EPoll &epoll);
+        BufferedConnection(tcp::Connection && con, EPoll &epoll);
         ~BufferedConnection() = default;
-        BufferedConnection(BufferedConnection && other) noexcept ;
+        BufferedConnection(BufferedConnection && other) noexcept;
 
+        void setEpollData(void * ptr);
         void openEpoll();
         void close();
         void subscribe(EventSubscribe event);
@@ -30,8 +37,6 @@ namespace net {
         std::string &getReadBuf();
         std::string &getWriteBuf();
         [[nodiscard]] const tcp::Descriptor &getDescriptor() const;
-        void ctl(int op, int event);
-        void setEpollData(void * ptr);
         BufferedConnection & operator=(BufferedConnection && other) noexcept;
     };
 

@@ -2,9 +2,8 @@
 #define HW_2_BASELOGGER_H
 
 #include <string>
-#include <vector>
 #include <iostream>
-#include <memory>
+#include <vector>
 
 namespace log {
 
