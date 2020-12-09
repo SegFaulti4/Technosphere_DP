@@ -59,7 +59,7 @@ namespace http {
 
     void HttpService::closeConnection(HttpConnection & http_con) {
         std::lock_guard lock(queue_mutex_);
-        opened_connections_amount_--;
+        --opened_connections_amount_;
         http_con.close();
         log::info("Closed connection valid " + std::to_string(http_con.isValid()));
         available_connections_.push(&http_con);
@@ -69,7 +69,7 @@ namespace http {
         try {
             HttpConnection http_con(server_.accept(), client_epoll_);
             log::info("New connection");
-            opened_connections_amount_++;
+            ++opened_connections_amount_;
             std::lock_guard lock(queue_mutex_);
             if (available_connections_.empty()) {
                 log::info("No connections available");
@@ -79,7 +79,7 @@ namespace http {
                 connections_.back().setRoutine(coroutine::create(&HttpService::onEvent, this, &connections_.back()));
                 connections_.back().openEpoll();
             } else {
-                auto con = available_connections_.front();
+                HttpConnection * con = available_connections_.front();
                 *con = std::move(http_con);
                 pushTimingConnection(*con);
                 con->setEpollData(con);
@@ -89,8 +89,6 @@ namespace http {
             }
         } catch (tcp::TcpBlockException &) {
             log::debug("Accept would block");
-        } catch (std::exception &exc) {
-            throw exc;
         }
     }
 
@@ -137,14 +135,10 @@ namespace http {
             HttpConnection & http_con = **it;
             std::lock_guard lock(http_con.getMutex());
             if (http_con.refreshIsDelayed()) {
-                auto prev_it = it;
-                it++;
-                timing_connections_.erase(prev_it);
+                it = timing_connections_.erase(it);
                 pushTimingConnection(http_con);
             } else if (http_con.downtimeDuration() > MAX_DOWNTIME) {
-                auto prev_it = it;
-                it++;
-                timing_connections_.erase(prev_it);
+                it = timing_connections_.erase(it);
                 if (http_con.isValid()) {
                     closeConnection(http_con);
                 }
@@ -159,35 +153,42 @@ namespace http {
         while (http_con->isValid()) {
             if (http_con->getEvent() & EPOLLOUT) {
                 log::info("OUT");
-                http_con->writeUntilEagain();
-                if (!http_con->isWriting()) {
-                    http_con->setDelayedRefresh();
-                    http_con->unsubscribe(net::EventSubscribe::WRITE);
-                } else {
-                    http_con->resubscribe();
+                try {
+                    http_con->writeUntilEagain();
+                } catch (HttpException & exc) {
+                    log::warn(exc.what());
+                    closeConnection(*http_con);
                 }
-            }
-            if (http_con->getEvent() & EPOLLIN) {
-                log::info("IN");
-                http_con->readUntilEagain();
-                bool keep_alive = false;
-                if (listener_) {
-                    if (http_con->requestAvailable()) {
-                        HttpRequest &request = http_con->getRequest();
-                        if (request.find("Connection") != request.end()
-                            && request["Connection"] == "keep-alive") {
-                            keep_alive = true;
-                        }
-                        log::info("keep-alive " + std::to_string(keep_alive));
-                        http_con->setDelayedRefresh();
-                        listener_->onRequest(*http_con);
-                        if (!keep_alive && !http_con->isWriting()) {
-                            closeConnection(*http_con);
-                        }
+                if (http_con->isValid()) {
+                    if (http_con->isWriting()) {
+                        http_con->resubscribe();
+                    } else if (http_con->keepAlive()) {
+                        http_con->unsubscribe(net::EventSubscribe::WRITE);
+                    } else {
+                        closeConnection(*http_con);
                     }
                 }
-                if (keep_alive || http_con->isWriting()) {
-                    http_con->resubscribe();
+            }
+            if (http_con->isValid() && http_con->getEvent() & EPOLLIN) {
+                log::info("IN");
+                try {
+                    http_con->readUntilEagain();
+                } catch (HttpException & exc) {
+                    log::warn(exc.what());
+                    closeConnection(*http_con);
+                }
+                if (http_con->isValid()) {
+                    if (http_con->requestAvailable()) {
+                        if (listener_) {
+                            http_con->setDelayedRefresh();
+                            listener_->onRequest(*http_con);
+                        }
+                        if (!http_con->isWriting()) {
+                            closeConnection(*http_con);
+                        }
+                    } else {
+                        http_con->resubscribe();
+                    }
                 }
             }
             http_con->setEvent(0);

@@ -1,3 +1,4 @@
+#include <iostream>
 #include "Service.h"
 #include "NetException.h"
 
@@ -49,7 +50,13 @@ namespace net {
 
     void BufferedConnection::readIntoBuf() {
         read_buf_.resize(read_buf_.size() + MAX_READ_LENGTH);
-        size_t res = connection_.read(read_buf_.data() + read_buf_.size() - MAX_READ_LENGTH, MAX_READ_LENGTH);
+        size_t res;
+        try {
+            res = connection_.read(read_buf_.data() + read_buf_.size() - MAX_READ_LENGTH, MAX_READ_LENGTH);
+        } catch (tcp::TcpBlockException &) {
+            read_buf_.resize(read_buf_.size() - MAX_READ_LENGTH);
+            throw NetBlockException("Read would block");
+        }
         read_buf_.resize(read_buf_.size() - MAX_READ_LENGTH + res);
         if (!res) {
             throw NetException("Nothing was read");
@@ -57,7 +64,12 @@ namespace net {
     }
 
     void BufferedConnection::writeFromBuf() {
-        size_t res = connection_.write(write_buf_.data(), write_buf_.size());
+        size_t res;
+        try {
+            res = connection_.write(write_buf_.data(), write_buf_.size());
+        } catch (tcp::TcpBlockException &) {
+            throw NetBlockException("Write would block");
+        }
         if (!res) {
             throw NetException("Nothing was written");
         }

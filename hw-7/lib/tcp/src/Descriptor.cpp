@@ -1,6 +1,7 @@
 #include "Descriptor.h"
 #include <string>
 #include <utility>
+#include <iostream>
 #include "unistd.h"
 #include "TcpException.h"
 
@@ -46,6 +47,7 @@ namespace tcp {
         ssize_t res = ::read(fd_, data, count);
         if (res == -1) {
             if (errno != EAGAIN && errno != EWOULDBLOCK) {
+                std::cerr << "er" << std::endl;
                 throw TcpException("Read error");
             } else {
                 throw TcpBlockException("Read would block");

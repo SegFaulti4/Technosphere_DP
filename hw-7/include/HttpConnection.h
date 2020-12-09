@@ -16,20 +16,20 @@ namespace http {
 
     class HttpConnection : private net::BufferedConnection {
     private:
-        enum class HttpParserMode {
-            REQUEST_LINE = 0,
-            MESSAGE_HEADERS = 1,
-            MESSAGE_BODY = 2
-        };
-
         HttpRequest request_;
         bool request_available_ = false;
         bool watchdog_refresh_flag_ = false;
-        HttpParserMode mode_ = HttpParserMode::REQUEST_LINE;
+        bool keep_alive_ = false;
         time_point last_used_ = steady_clock::now();
         std::mutex mutex_;
         coroutine::routine_t routine_ = 0;
         int event_ = 0;
+
+        void setRequestAvailable();
+        void parseRequestLine();
+        void parseMessageHeaders();
+        void parseBody();
+        void parseRequest();
 
     public:
         HttpConnection(tcp::Connection && con, net::EPoll &epoll);
@@ -48,6 +48,7 @@ namespace http {
         bool isWriting();
         bool isValid();
         bool refreshIsDelayed();
+        bool keepAlive() const;
         void setDelayedRefresh();
         bool requestAvailable() const;
         std::mutex & getMutex();
@@ -57,8 +58,7 @@ namespace http {
         void setRoutine(coroutine::routine_t routine);
         void resume();
 
-        HttpRequest & getRequest();
-        void clearRequest();
+        HttpRequest && getRequest();
         void writeResponse(const std::string & response);
 
         HttpConnection & operator=(HttpConnection && other) noexcept;

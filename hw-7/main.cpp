@@ -8,11 +8,10 @@ public:
 
     void onRequest(http::HttpConnection & con) {
         log::info("request");
-        http::HttpRequest & request = con.getRequest();
+        http::HttpRequest request = con.getRequest();
         /*for (const auto& it : request) {
             std::cout << it.first << ": " << it.second << std::endl;
         }*/
-        con.clearRequest();
         con.writeResponse("HTTP/1.1 200 OK\r\n\r\n");
     }
 };

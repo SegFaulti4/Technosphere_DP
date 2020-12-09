@@ -11,6 +11,10 @@ namespace net {
         using tcp::TcpException::TcpException;
     };
 
+    class NetBlockException : public NetException {
+        using NetException::NetException;
+    };
+
 }
 
 #endif //NET_NETEXCEPTION_H

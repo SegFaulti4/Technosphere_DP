@@ -9,6 +9,10 @@ namespace http {
         using net::NetException::NetException;
     };
 
+    class HttpOnCloseException : public HttpException {
+        using HttpException::HttpException;
+    };
+
 }
 
 #endif //HTTP_HTTPEXCEPTION_H
