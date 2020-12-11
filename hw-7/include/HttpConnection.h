@@ -23,7 +23,6 @@ namespace http {
         time_point last_used_ = steady_clock::now();
         std::mutex mutex_;
         coroutine::routine_t routine_ = 0;
-        int event_ = 0;
 
         void setRequestAvailable();
         void parseRequestLine();
@@ -41,6 +40,7 @@ namespace http {
         void openEpoll();
         void readUntilEagain();
         void writeUntilEagain();
+        void subscribe(net::EventSubscribe event);
         void unsubscribe(net::EventSubscribe event);
         void resubscribe();
         void refreshTime();
@@ -53,8 +53,6 @@ namespace http {
         bool requestAvailable() const;
         std::mutex & getMutex();
         const tcp::Descriptor & getDescriptor() const;
-        void setEvent(int event);
-        int getEvent();
         void setRoutine(coroutine::routine_t routine);
         void resume();
 

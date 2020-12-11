@@ -1,4 +1,3 @@
-#include <iostream>
 #include "http.h"
 #include "log.h"
 
@@ -19,7 +18,7 @@ public:
 http::IHttpServiceListener::~IHttpServiceListener() = default;
 
 int main() {
-    log::initWithStderrLogger(log::LL_WARN);
+    log::initWithStderrLogger(log::LL_INFO);
     ReadService listener;
     http::HttpService service(1, &listener);
     service.open(INADDR_ANY, 8080);

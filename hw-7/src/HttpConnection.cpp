@@ -16,9 +16,9 @@ namespace http {
     const std::string ALLOWED_MESSAGE_HEADERS[] = {
             "Connection: ",
             "Content-Length: ",
-            "User-Agent",
-            "Accept",
-            "Host"
+            "User-Agent: ",
+            "Accept: ",
+            "Host: "
     };
 
     constexpr int MAX_REQUEST_LENGTH = 4096;
@@ -33,6 +33,7 @@ namespace http {
         other.request_.clear();
         request_available_ = std::exchange(other.request_available_, false);
         last_used_ = other.last_used_;
+        keep_alive_ = std::exchange(other.keep_alive_, false);
         setEpollData(this);
     }
 
@@ -41,6 +42,7 @@ namespace http {
             last_used_ = other.last_used_;
             request_ = std::move(other.request_);
             request_available_ = other.request_available_;
+            keep_alive_ = std::exchange(other.keep_alive_, false);
             setEpollData(this);
             reinterpret_cast<net::BufferedConnection *>(this)->operator=(std::move(other));
         }
@@ -152,8 +154,6 @@ namespace http {
             if (!request_available_) {
                 parseBody();
             }
-        } else if (str.size() > MAX_REQUEST_LENGTH) {
-            throw HttpException("Request size exceeded");
         }
     }
 
@@ -164,6 +164,9 @@ namespace http {
         while (true) {
             try {
                 readIntoBuf();
+                if (read_buf_.size() > MAX_REQUEST_LENGTH) {
+                    throw HttpException("Request size exceeded");
+                }
             } catch (net::NetBlockException &) {
                 break;
             } catch (net::NetException &) {
@@ -228,7 +231,8 @@ namespace http {
         request_.clear();
         request_available_ = false;
         routine_ = 0;
-        event_ = 0;
+        keep_alive_ = false;
+        watchdog_refresh_flag_ = false;
     }
 
     void HttpConnection::setEpollData(void * ptr) {
@@ -239,6 +243,10 @@ namespace http {
         reinterpret_cast<net::BufferedConnection *>(this)->openEpoll();
         log::info(std::to_string(connection_.getDescriptor().getFd()) + " " + std::to_string((long long) this)
                 + " " + std::to_string((long long) epoll_data_) + " " + std::to_string(subscription_));
+    }
+
+    void HttpConnection::subscribe(net::EventSubscribe event) {
+        reinterpret_cast<net::BufferedConnection *>(this)->subscribe(event);
     }
 
     void HttpConnection::unsubscribe(net::EventSubscribe event) {
@@ -257,14 +265,6 @@ namespace http {
     void HttpConnection::writeResponse(const std::string &response) {
         write_buf_.append(response);
         subscribe(net::EventSubscribe::WRITE);
-    }
-
-    void HttpConnection::setEvent(int event) {
-        event_ = event;
-    }
-
-    int HttpConnection::getEvent() {
-        return event_;
     }
 
     void HttpConnection::setRoutine(coroutine::routine_t routine) {
