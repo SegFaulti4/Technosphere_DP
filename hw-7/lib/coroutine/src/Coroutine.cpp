@@ -43,7 +43,7 @@ namespace coroutine {
                 : func{f}, stack{std::make_unique<uint8_t[]>(Ordinator::STACK_SIZE)} {
             ctx.uc_stack.ss_sp = stack.get();
             ctx.uc_stack.ss_size = Ordinator::STACK_SIZE;
-            ctx.uc_link = &threadOrdinator.ctx;
+            ctx.uc_link = nullptr;
             getcontext(&ctx);
             makecontext(&ctx, entry, 0);
         }
@@ -83,6 +83,7 @@ namespace coroutine {
         }
 
         to.current = id;
+        routine_ptr->ctx.uc_link = &to.ctx;
         if (swapcontext(&to.ctx, &routine_ptr->ctx) < 0) {
             to.current = 0;
             return false;
@@ -137,6 +138,7 @@ namespace coroutine {
             std::lock_guard lock(o.ordinator_mutex);
             o.finished.emplace(id);
         }
+        swapcontext(&routine_ptr->ctx, routine_ptr->ctx.uc_link);
     }
 
 }
