@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.17)
 project(http)
 
-set(CMAKE_CXX_FLAGS -pthread)
 set(CMAKE_CXX_STANDARD 17)
 
 set(TCP_LIB_NAME tcp)
@@ -36,9 +35,10 @@ target_include_directories(${LOGGER_LIB_NAME} PUBLIC ${LOGGER_LIB_INCLUDE})
 add_library(${COROUTINE_LIB_NAME} STATIC ${COROUTINE_LIB_SRC})
 target_include_directories(${COROUTINE_LIB_NAME} PUBLIC ${COROUTINE_LIB_INCLUDE})
 
+find_package( Threads )
 add_library(${PROJECT_NAME} STATIC ${PROJECT_SRC})
 target_include_directories(${PROJECT_NAME} PUBLIC ${PROJECT_INCLUDE})
-target_link_libraries(${PROJECT_NAME} PUBLIC ${NET_LIB_NAME} ${LOGGER_LIB_NAME} ${COROUTINE_LIB_NAME})
+target_link_libraries(${PROJECT_NAME} PUBLIC ${CMAKE_THREAD_LIBS_INIT} ${NET_LIB_NAME} ${LOGGER_LIB_NAME} ${COROUTINE_LIB_NAME})
 
 add_executable(test main.cpp)
 target_link_libraries(test PUBLIC ${PROJECT_NAME})

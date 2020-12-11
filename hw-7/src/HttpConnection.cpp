@@ -1,24 +1,17 @@
 #include "HttpConnection.h"
 #include "HttpException.h"
 #include "log.h"
+#include <unordered_set>
+#include <sstream>
 
 namespace http {
 
-    const std::string ALLOWED_REQUEST_METHODS[] = {
-            "GET"
-    };
-
-    const std::string ALLOWED_TYPE_VERSIONS[] = {
-            "HTTP/1.1",
-            "HTTP/1.0"
-    };
-
-    const std::string ALLOWED_MESSAGE_HEADERS[] = {
-            "Connection: ",
-            "Content-Length: ",
+    const std::unordered_set<std::string> ALLOWED_MESSAGE_HEADERS = {
+            "Connection",
+            "Content-Length",
             "User-Agent",
             "Accept",
-            "Host"
+            "Host",
     };
 
     constexpr int MAX_REQUEST_LENGTH = 4096;
@@ -33,6 +26,7 @@ namespace http {
         other.request_.clear();
         request_available_ = std::exchange(other.request_available_, false);
         last_used_ = other.last_used_;
+        keep_alive_ = std::exchange(other.keep_alive_, false);
         setEpollData(this);
     }
 
@@ -41,119 +35,80 @@ namespace http {
             last_used_ = other.last_used_;
             request_ = std::move(other.request_);
             request_available_ = other.request_available_;
+            keep_alive_ = std::exchange(other.keep_alive_, false);
             setEpollData(this);
             reinterpret_cast<net::BufferedConnection *>(this)->operator=(std::move(other));
         }
         return *this;
     }
 
-    void HttpConnection::parseRequestLine() {
-        int pos = 0;
-        std::string & str = read_buf_;
-        int end_of_req_line = str.find("\r\n", pos);
-        log::info("end req line found");
+    void HttpConnection::parseRequestLine(std::istringstream &in) {
         std::string tmp;
-        for (const std::string &method : ALLOWED_REQUEST_METHODS) {
-            if (str.find(method, pos) == pos) {
-                tmp = method;
-                break;
-            }
-        }
-        if (tmp.empty()) {
-            throw HttpException("Wrong request format");
-        }
-        log::info("method " + tmp);
-        request_["method"] = tmp;
-        pos += tmp.size();
-        int tmp_pos = str.find(' ', pos + 1);
-        if (str.find(' ', pos) != pos || tmp_pos == std::string::npos
-            || tmp_pos > end_of_req_line || tmp_pos == pos + 1) {
-            throw HttpException("Wrong request format");
-        }
-        log::info("URI " + str.substr(pos + 1, tmp_pos - pos));
-        request_["URI"] = str.substr(pos + 1, tmp_pos - pos);
-        pos = tmp_pos + 1;
-        tmp.clear();
-        for (const std::string &type_version : ALLOWED_TYPE_VERSIONS) {
-            if (str.find(type_version, pos) == pos) {
-                tmp = type_version;
-                break;
-            }
-        }
-        if (tmp.empty() || (pos + tmp.size()) != end_of_req_line
-            || (tmp_pos = str.find('/', pos)) == std::string::npos) {
-            throw HttpException("Wrong request format");
-        }
-        log::info("type " + str.substr(pos, tmp_pos - pos));
-        log::info("version " +
-                  str.substr(tmp_pos + 1, end_of_req_line - tmp_pos - 1));
-        request_["type"] = str.substr(pos, tmp_pos - pos);
-        request_["version"] = str.substr(tmp_pos + 1, end_of_req_line - tmp_pos - 1);
-        str.erase(0, end_of_req_line + 2);
+        std::getline(in, tmp, '\r');
+        request_["request line"] = tmp;
+        log::debug(request_["request line"]);
+        in.ignore();
     }
 
-    void HttpConnection::parseMessageHeaders() {
-        int pos;
-        std::string & str = read_buf_;
-        while ((pos = str.find("\r\n")) != std::string::npos) {
-            if (str.find("\r\n") == 0) {
-                str.erase(0, 2);
-                if (request_.find("Content-Length") == request_.end()) {
-                    if (!str.empty()) {
-                        throw HttpException("Only one request is allowed at a time");
-                    }
-                    setRequestAvailable();
-                }
-                break;
-            }
-            std::string tmp;
-            for (const std::string &message_header : ALLOWED_MESSAGE_HEADERS) {
-                if (str.find(message_header)) {
-                    tmp = message_header;
-                }
-            }
-            if (tmp.empty()) {
+    void HttpConnection::parseMessageHeaders(std::istringstream &in) {
+        std::string header;
+        std::string tmp;
+        std::getline(in, header, ':');
+        log::debug("header: " + header);
+        while (!header.empty()) {
+            if (ALLOWED_MESSAGE_HEADERS.find(header) == ALLOWED_MESSAGE_HEADERS.end()) {
                 throw HttpException("Wrong request format");
             }
-            tmp.erase(tmp.size() - 2);
-            if (request_.find(tmp) != request_.end()) {
-                throw HttpException("Wrong request format");
-            }
-            request_[tmp] = str.substr(tmp.size() + 2, pos);
-            str.erase(0, pos + 2);
+            in.ignore(1);
+            std::getline(in, tmp, '\r');
+            request_[header] = tmp;
+            log::debug(request_[header]);
+            in.ignore(1);
+            header.clear();
+            std::getline(in, header, ':');
+            log::debug("header: " + header);
+        }
+    }
+
+    void HttpConnection::parseHead() {
+        int pos = read_buf_.find("\r\n\r\n");
+        std::string head = read_buf_.substr(0, pos);
+        read_buf_.erase(0, pos + 4);
+        std::istringstream in(head);
+
+        parseRequestLine(in);
+        parseMessageHeaders(in);
+
+        if (request_.find("Content-Length") == request_.end()) {
+            request_available_ = true;
+            read_buf_.clear();
         }
     }
 
     void HttpConnection::parseBody() {
-        std::string & str = read_buf_;
-        int pos = str.find("\r\n\r\n");
-        if (pos != std::string::npos) {
-            if (str.size() - pos - 4 > 0) {
-                throw HttpException("Only one request is allowed at a time");
-            }
-            if (str.size() - 4 != std::stoi(request_["Content-Length"])) {
-                throw HttpException("Wrong content length");
-            }
-            request_["body"] = str.substr(0, pos);
-            setRequestAvailable();
-            str.clear();
-        } else if (str.size() > std::stoi(request_["Content-Length"])) {
-            throw HttpException("Message body size exceeded");
-        }
+        request_["body"] = read_buf_.substr(0, read_buf_.find("\r\n\r\n"));
+        read_buf_.clear();
+        request_available_ = true;
     }
 
     void HttpConnection::parseRequest() {
-        std::string & str = read_buf_;
-        if (request_.find("Content-Length") != request_.end()) {
-            parseBody();
-        } else if (str.find("\r\n\r\n") != std::string::npos) {
-            parseRequestLine();
-            parseMessageHeaders();
-            if (!request_available_) {
+        while (read_buf_.find("\r\n\r\n") != std::string::npos && !requestAvailable()) {
+            if (request_.find("Content-Length") != request_.end()) {
                 parseBody();
+            } else {
+                parseHead();
             }
-        } else if (str.size() > MAX_REQUEST_LENGTH) {
-            throw HttpException("Request size exceeded");
+        }
+        if (request_available_) {
+            if (request_.find("Connection") != request_.end()) {
+                log::info("Connection: |" + request_["Connection"] + "|");
+            }
+            if (request_.find("Connection") != request_.end() &&
+                    (request_["Connection"] == "Keep-Alive" || request_["Connection"] == "keep-alive")) {
+                keep_alive_ = true;
+            } else {
+                keep_alive_ = false;
+            }
         }
     }
 
@@ -164,6 +119,9 @@ namespace http {
         while (true) {
             try {
                 readIntoBuf();
+                if (read_buf_.size() > MAX_REQUEST_LENGTH) {
+                    throw HttpException("Request size exceeded");
+                }
             } catch (net::NetBlockException &) {
                 break;
             } catch (net::NetException &) {
@@ -228,7 +186,8 @@ namespace http {
         request_.clear();
         request_available_ = false;
         routine_ = 0;
-        event_ = 0;
+        keep_alive_ = false;
+        watchdog_refresh_flag_ = false;
     }
 
     void HttpConnection::setEpollData(void * ptr) {
@@ -241,6 +200,10 @@ namespace http {
                 + " " + std::to_string((long long) epoll_data_) + " " + std::to_string(subscription_));
     }
 
+    void HttpConnection::subscribe(net::EventSubscribe event) {
+        reinterpret_cast<net::BufferedConnection *>(this)->subscribe(event);
+    }
+
     void HttpConnection::unsubscribe(net::EventSubscribe event) {
         reinterpret_cast<net::BufferedConnection *>(this)->unsubscribe(event);
     }
@@ -250,6 +213,7 @@ namespace http {
     }
 
     HttpRequest && HttpConnection::getRequest() {
+        request_available_ = false;
         return std::move(request_);
     }
 
@@ -257,14 +221,6 @@ namespace http {
     void HttpConnection::writeResponse(const std::string &response) {
         write_buf_.append(response);
         subscribe(net::EventSubscribe::WRITE);
-    }
-
-    void HttpConnection::setEvent(int event) {
-        event_ = event;
-    }
-
-    int HttpConnection::getEvent() {
-        return event_;
     }
 
     void HttpConnection::setRoutine(coroutine::routine_t routine) {
@@ -287,5 +243,9 @@ namespace http {
             keep_alive_ = false;
         }
         request_available_ = true;
+    }
+
+    void HttpConnection::switchEvent() {
+        epoll_.mod(connection_.getDescriptor(), epoll_data_, subscription_ - EPOLLOUT + EPOLLIN);
     }
 }

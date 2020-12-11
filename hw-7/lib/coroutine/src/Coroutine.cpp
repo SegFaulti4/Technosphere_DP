@@ -3,6 +3,7 @@
 #include <memory>
 #include <ucontext.h>
 #include <mutex>
+#include <iostream>
 
 namespace coroutine {
     struct Routine;
@@ -19,6 +20,10 @@ namespace coroutine {
         std::mutex ordinator_mutex;
         std::vector<Routine> routines;
         std::queue<routine_t> finished;
+
+        Ordinator() {
+            routines.reserve(MAX_ROUTINE_AMOUNT);
+        }
     } ordinator;
 
     struct Routine {
@@ -39,7 +44,7 @@ namespace coroutine {
                 : func{f}, stack{std::make_unique<uint8_t[]>(Ordinator::STACK_SIZE)} {
             ctx.uc_stack.ss_sp = stack.get();
             ctx.uc_stack.ss_size = Ordinator::STACK_SIZE;
-            ctx.uc_link = &threadOrdinator.ctx;
+            //ctx.uc_link = &threadOrdinator.ctx;
             getcontext(&ctx);
             makecontext(&ctx, entry, 0);
         }
@@ -66,26 +71,27 @@ namespace coroutine {
     bool resume(routine_t id) {
         auto& o = ordinator;
         auto& to = threadOrdinator;
+        Routine *routine_ptr;
         {
             std::lock_guard lock(o.ordinator_mutex);
             if (id == 0 || id > o.routines.size()) {
                 return false;
             }
+            routine_ptr = &o.routines[id - 1];
         }
-
-        const auto& routine = o.routines[id - 1];
-        if (routine.finished) {
+        if (routine_ptr->finished) {
             return false;
         }
 
         to.current = id;
-        if (swapcontext(&to.ctx, &routine.ctx) < 0) {
+        routine_ptr->ctx.uc_link = &to.ctx;
+        if (swapcontext(&to.ctx, &routine_ptr->ctx) < 0) {
             to.current = 0;
             return false;
         }
 
-        if (routine.exception) {
-            std::rethrow_exception(routine.exception);
+        if (routine_ptr->exception) {
+            std::rethrow_exception(routine_ptr->exception);
         }
 
         return true;
@@ -95,10 +101,14 @@ namespace coroutine {
         auto& o = ordinator;
         auto& to = threadOrdinator;
         routine_t id = to.current;
-        auto& routine = o.routines[id - 1];
+        Routine *routine_ptr;
+        {
+            std::lock_guard lock(o.ordinator_mutex);
+            routine_ptr = &o.routines[id - 1];
+        }
 
         to.current = 0;
-        swapcontext(&routine.ctx, &to.ctx);
+        swapcontext(&routine_ptr->ctx, &to.ctx);
     }
 
     routine_t current() {
@@ -109,22 +119,27 @@ namespace coroutine {
         auto& o = ordinator;
         auto& to = threadOrdinator;
         routine_t id = to.current;
-        auto &routine = o.routines[id - 1];
+        Routine *routine_ptr;
+        {
+            std::lock_guard lock(o.ordinator_mutex);
+            routine_ptr = &o.routines[id - 1];
+        }
 
-        if (routine.func) {
+        if (routine_ptr->func) {
             try {
-                routine.func();
+                routine_ptr->func();
             } catch (...) {
-                routine.exception = std::current_exception();
+                routine_ptr->exception = std::current_exception();
             }
         }
 
-        routine.finished = true;
+        routine_ptr->finished = true;
         to.current = 0;
         {
             std::lock_guard lock(o.ordinator_mutex);
             o.finished.emplace(id);
         }
+        swapcontext(&routine_ptr->ctx, routine_ptr->ctx.uc_link);
     }
 
 }

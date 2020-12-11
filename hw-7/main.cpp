@@ -1,4 +1,3 @@
-#include <iostream>
 #include "http.h"
 #include "log.h"
 
@@ -12,7 +11,7 @@ public:
         /*for (const auto& it : request) {
             std::cout << it.first << ": " << it.second << std::endl;
         }*/
-        con.writeResponse("HTTP/1.1 200 OK\r\n\r\n");
+        con.writeResponse("HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: Keep-Alive\r\n\r\n");
     }
 };
 

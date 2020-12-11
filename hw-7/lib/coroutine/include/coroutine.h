@@ -5,6 +5,8 @@
 
 namespace coroutine {
 
+    constexpr int MAX_ROUTINE_AMOUNT = 10000;
+
     using routine_t = unsigned long;
     using RoutineFunction = std::function<void()>;
 
